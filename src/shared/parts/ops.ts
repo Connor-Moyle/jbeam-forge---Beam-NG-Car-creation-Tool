@@ -1,5 +1,5 @@
 import type { Part, Project } from '../project/schema';
-import { POSITIONS_BY_AXIS, type PositionAxis, type TaxonomyEntry } from '../taxonomy/schema';
+import { POSITIONS_BY_AXIS, SHELL_KINDS, type PositionAxis, type TaxonomyEntry } from '../taxonomy/schema';
 import type { Proposal } from '../taxonomy/classify';
 import { placement, positionCompat } from '../taxonomy/positions';
 
@@ -89,7 +89,9 @@ export function findParent(doc: Doc, tax: TaxonomyLookup, entry: TaxonomyEntry, 
     }
     if (best) return best.id;
   }
-  return null;
+  // No ancestor kind among the parts (a truck has a cab and a frame, no body shell): the shell it has.
+  if (!entry.parent || (SHELL_KINDS as readonly string[]).includes(entry.id)) return null;
+  return SHELL_KINDS.map((k) => doc.parts.find((p) => p.taxonomyId === k && !p.variantOf)).find(Boolean)?.id ?? null;
 }
 
 /** Turn an auto-classification proposal into parts + assignments. Returns the created part ids. */

@@ -2,7 +2,7 @@ import { create } from 'zustand';
 import { couplerFor } from '@shared/hinges/schema';
 import { syncScriptProps, type MeshBounds } from '@shared/lua/animate';
 import { BLANK_SCRIPT, libraryToScript, scriptToLibrary, uniqueScriptName, parseLibraryScript } from '@shared/lua/library/share';
-import { defaultParams, outputName, type ScriptTemplate } from '@shared/lua/templates';
+import { defaultParams, outputName, scriptActions, type ScriptTemplate } from '@shared/lua/templates';
 import type { LibraryScript, ScriptParamValue, VehicleScript } from '@shared/lua/types';
 import type { Project } from '@shared/project/schema';
 import type { SandboxResult } from '@shared/lua/sandbox';
@@ -72,8 +72,25 @@ export function addFromTemplate(templateId: string): string | null {
   const doc = projectStore.getState().doc;
   if (!t || !doc) return null;
   const id = newId('script');
-  add({ id, name: uniqueScriptName(t.name0, takenNames()), label: t.name, templateId: t.id, enabled: true, params: fitToCar(t, defaultParams(t), doc), code: null, partId: null }, `Add ${t.name.toLowerCase()}`);
+  add({ id, name: uniqueScriptName(t.name0, takenNames()), label: t.name, templateId: t.id, enabled: true, params: fitToCar(t, defaultParams(t), doc), code: null, partId: null, ...freeKeys(t, doc) }, `Add ${t.name.toLowerCase()}`);
   return id;
+}
+
+/** The template's keys that another script already uses, moved to free ones (the same modifier, the next letter or digit): a car with every template had five pairs on one key. */
+function freeKeys(t: ScriptTemplate, doc: Project): { actions?: VehicleScript['actions'] } {
+  const used = new Set((doc.scripts ?? []).flatMap((s) => scriptActions(s.templateId ? (templateById(s.templateId) ?? null) : null, s).map((a) => a.key)).filter(Boolean));
+  const actions = t.actions.flatMap((a) => {
+    if (!a.key || !used.has(a.key)) {
+      used.add(a.key);
+      return [];
+    }
+    const mod = a.key.split(' ').slice(0, -1).join(' ') || 'lctrl';
+    const free = [...'abcdefghijklmnopqrstuvwxyz0123456789'].map((c) => `${mod} ${c}`).find((k) => !used.has(k));
+    if (!free) return [];
+    used.add(free);
+    return [{ id: a.id, label: a.label, call: a.call, key: free }];
+  });
+  return actions.length ? { actions } : {};
 }
 
 export function addBlankScript(): void {

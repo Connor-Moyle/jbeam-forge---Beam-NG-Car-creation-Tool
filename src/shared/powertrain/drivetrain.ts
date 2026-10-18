@@ -59,6 +59,30 @@ export interface PtRow {
   options?: JbeamObject;
 }
 
+/**
+ * The set's wheel and powertrain device names that another axle already uses, given a suffix
+ * (RL → RL_R2, differential_R → differential_R_R2), wherever the parts name them: the game builds
+ * each wheel and device once, so a truck can't carry the same rear axle twice as it comes.
+ */
+export function renameClashingNames(parts: Readonly<Record<string, JbeamObject>>, used: ReadonlySet<string>, suffix: string): { parts: Record<string, JbeamObject>; names: string[] } {
+  const names = [...new Set([...wheelNames(parts), ...powertrainRows(parts).map((r) => r.name)])];
+  const map = new Map(names.filter((n) => used.has(n)).map((n) => [n, `${n}_${suffix}`]));
+  const renamed = names.map((n) => map.get(n) ?? n);
+  if (!map.size) return { parts: { ...parts }, names: renamed };
+  const rename = (v: JbeamValue): JbeamValue => (typeof v === 'string' ? (map.get(v) ?? v) : Array.isArray(v) ? v.map(rename) : isJbeamObject(v) ? Object.fromEntries(Object.entries(v).map(([k, x]) => [k, rename(x)])) : v);
+  return { parts: Object.fromEntries(Object.entries(parts).map(([n, p]) => [n, rename(p) as JbeamObject])), names: renamed };
+}
+
+/** Each axle's parts with wheel and device names made unique against the axles before it (the UI's view of what the export does). */
+export function uniqueAxleParts<T extends { parts: Readonly<Record<string, JbeamObject>> }>(axles: readonly T[], suffixOf: (i: number) => string): T[] {
+  const used = new Set<string>();
+  return axles.map((a, i) => {
+    const r = renameClashingNames(a.parts, used, suffixOf(i));
+    for (const n of r.names) used.add(n);
+    return { ...a, parts: r.parts };
+  });
+}
+
 /** The final drive a differential we add gets when the gearbox brought none to copy. */
 export const DEFAULT_FINAL_DRIVE = 3.7;
 

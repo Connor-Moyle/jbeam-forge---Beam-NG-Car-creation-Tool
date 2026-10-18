@@ -204,6 +204,12 @@ export const MIGRATIONS: readonly Migration[] = [
     describe: 'other suspensions on an axle, one chosen per configuration',
     migrate: (doc) => ({ ...doc, formatVersion: 27 }),
   },
+  {
+    from: 27,
+    // Nothing to change: an axle's steering range and the car's fuel capacity are new and optional.
+    describe: 'an axle’s steering range; the car’s fuel capacity',
+    migrate: (doc) => ({ ...doc, formatVersion: 28 }),
+  },
 ];
 
 export class MigrationError extends Error {

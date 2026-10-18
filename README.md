@@ -249,6 +249,8 @@ Other controls:
 
 The cleanup pass welds duplicate points, removes slivers, splits beams that are too long (floppy) and collapses ones that are too short (unstable). You don't have to think about any of that unless you want to.
 
+**refNodes.** The game needs four reference nodes on the main part (ref, back, left, up). Generate places them when it builds the body shell; if your body's nodes came another way (typed in the JBeam workspace, a car brought in from the game, an older project), press **Place refNodes** in the body's Structure section, or just export: the export places them itself when the project has none. A truck with no body shell uses its frame.
+
 ### Editing
 ![The JBeam workspace: every node and beam in tables](docs/images/edit.png)
 
@@ -342,7 +344,9 @@ You can mix both approaches. A per-corner checklist shows what's from your mesh 
 
 **Tuning per setup:** spring and damping (bump and rebound), ride height, travel, caster, camber, toe, track width, steering lock and ratio, anti-roll bars, tyre size and pressure. Presets for Comfort, Sport, Drift, Rally and Race get you in the ballpark.
 
-**Multiple setups per axle.** Make a "Double Wishbone" and a "DW Drift" and both show up as options in the parts menu. Trucks with three or four axles work too, with each axle set as steered and/or driven.
+**Multiple setups per axle.** Make a "Double Wishbone" and a "DW Drift" and both show up as options in the parts menu.
+
+**As many axles as the truck has.** *Add axle* puts another one behind the last; give each its position, name, track and whether it steers (*Steers* decides which of the game's suspensions it's offered: steered ones or not). The same game axle can go on two axles (a tandem): on export the second one's wheels and drivetrain devices get their own names, and an axle beyond the first of its end carries its own copies of the wheels you picked for it, so the game can build every wheel. **Steering range** on a steered axle scales its suspension's steering travel: a twin-steer truck's second axle at 60% turns less than the first.
 
 **Other suspensions for an axle.** With a game suspension fitted, *Add another suspension* puts a second (or third) one from the game in the same slot: each configuration picks one (a crawler's live axles for the rock version, the desert truck's for the trophy version), and the player can swap them in the parts menu. The fitted one stays the default and the one shown in the 3D view.
 
@@ -369,6 +373,8 @@ You can mix both approaches. A per-corner checklist shows what's from your mesh 
 **Meshes and variants.** Every component can have its own mesh. Make "Turbo Stage 1/2/3" as variants, each with its own specs *and* its own turbo mesh, and they're all selectable in-game.
 
 **Engine sound.** Pick from the game's own engine sounds with a filterable list, or go to the Sound tab for the mix and your own recordings.
+
+**Fuel.** The Fuel card under the gearbox sets what the car's tank holds (60 L unless you say; a long-haul truck can carry 1200 L). Several engines fitted share it between the tanks they ask for.
 
 The sandbox doesn't simulate the powertrain, so the dyno chart is your preview there.
 

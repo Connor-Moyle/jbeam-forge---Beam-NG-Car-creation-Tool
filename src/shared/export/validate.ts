@@ -77,8 +77,10 @@ export function validateExport(doc: Doc, tax: TaxonomyLookup, input: ValidationI
     const meshes = Object.keys(doc.assignments).filter((k) => doc.assignments[k] === part.id && !doc.ignoredMeshes.includes(k));
     const role = partRole(entry, partSettings(doc, part, entry));
     const hasNodes = doc.nodes.some((n) => n.partId === part.id);
+    const allIgnored = meshes.length === 0 && Object.keys(doc.assignments).some((k) => doc.assignments[k] === part.id);
+    // Every mesh set to Ignore (a model's own wheels under a game suspension): the part is left out of the mod, nothing to say.
     if (meshes.length === 0) {
-      warn('part-empty', `${part.displayName} has no meshes; it exports as an empty slot option.`, part.id);
+      if (!allIgnored) warn('part-empty', `${part.displayName} has no meshes; it exports as an empty slot option.`, part.id);
       continue;
     }
     if (role === 'own' && !hasNodes && !GAME_SET_IDS.has(part.taxonomyId)) {

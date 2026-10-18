@@ -13,6 +13,7 @@ import { addFromTemplate, useScriptUi } from '@renderer/scripts/commands';
 import { allTemplates, templateById } from '@renderer/scripts/registry';
 import { ScriptPanel } from '@renderer/scripts/ScriptPanel';
 import { withMeshNames } from '@shared/parts/meshNames';
+import { SET_KINDS } from '@shared/export/jbeam';
 import { PROP_KINDS } from '@shared/props/props';
 import type { ScriptTemplate } from '@shared/lua/templates';
 import { Badge } from '@renderer/ui/components/Badge';
@@ -45,7 +46,7 @@ export function movingTemplates(): ScriptTemplate[] {
 
 /** Meshes worth animating, by their names. */
 const SUGGEST: { re: RegExp; kind: string }[] = [
-  { re: /steer/i, kind: 'steering' },
+  { re: /steering.?wheel|^steer(ing)?$/i, kind: 'steering' },
   { re: /tach|rpm/i, kind: 'tacho' },
   { re: /speedo|speed_needle/i, kind: 'speedo' },
   { re: /fuel.*needle|needle.*fuel/i, kind: 'fuel' },
@@ -74,9 +75,13 @@ export function MovingPartsPanel() {
   const movingIds = new Set(movingTemplates().map((t) => t.id));
   const scripts = (doc.scripts ?? []).filter((s) => s.templateId && movingIds.has(s.templateId));
   const nameOf = (key: string) => meshes.find((m) => m.key === key)?.name ?? key.slice(key.indexOf(':') + 1);
+  // By the mesh's shown name or the one it had in the file (the app renames a sorted mesh after its part: a "speedo_needle" shows as "gauge_cluster_2").
+  const original = new Map(allMeshes(sources).map((m) => [m.key, m.name]));
+  // Not the game's suspension and engine meshes: their steering racks and knuckles are no steering wheel.
+  const setParts = new Set(doc.parts.filter((p) => SET_KINDS.has(p.taxonomyId)).map((p) => p.id));
   const suggestions = meshes
-    .filter((m) => !props.some((p) => p.meshKey === m.key))
-    .map((m) => ({ m, kind: SUGGEST.find((s) => s.re.test(m.name))?.kind }))
+    .filter((m) => !props.some((p) => p.meshKey === m.key) && !setParts.has(doc.assignments[m.key] ?? ''))
+    .map((m) => ({ m, kind: SUGGEST.find((s) => s.re.test(m.name) || s.re.test(original.get(m.key) ?? ''))?.kind }))
     .filter((x): x is { m: (typeof meshes)[number]; kind: string } => !!x.kind);
 
   const isPicked = (p: Pick) => JSON.stringify(p) === JSON.stringify(picked);

@@ -36,7 +36,10 @@ function walk(v: JbeamValue | undefined, visit: (key: string, value: JbeamValue)
     }
 }
 
-export function mainAdditions(texts: readonly string[], hasEngine: boolean): MainAdditions {
+/** The fuel the car carries when the project doesn't say (litres). */
+export const DEFAULT_FUEL_L = 60;
+
+export function mainAdditions(texts: readonly string[], hasEngine: boolean, fuelL = DEFAULT_FUEL_L): MainAdditions {
   const parts: JbeamObject[] = [];
   for (const t of texts) {
     try {
@@ -74,7 +77,7 @@ export function mainAdditions(texts: readonly string[], hasEngine: boolean): Mai
     } else {
       storageRows.push(['fuelTank', name]);
       // Fuel catches fire with the engine's fuel group, as the game's tanks do.
-      storages[name] = { energyType: type, fuelCapacity: Math.round(60 / fuelCount), startingFuelCapacity: '$fuel', fuel: { '[engineGroup]:': ['fuel'] } };
+      storages[name] = { energyType: type, fuelCapacity: Math.round(fuelL / fuelCount), startingFuelCapacity: '$fuel', fuel: { '[engineGroup]:': ['fuel'] } };
     }
   }
 
@@ -100,7 +103,7 @@ export function mainAdditions(texts: readonly string[], hasEngine: boolean): Mai
   const unknownVariables: string[] = [];
   for (const name of [...used].sort()) {
     if (definedVars.has(name)) continue;
-    const known = name === '$fuel' && electricCount && !fuelCount ? ['range', 'kWh', 'Chassis', 60, 0, 60, 'Battery Level', 'Initial battery charge'] : name === '$fuel' ? ['range', 'L', 'Chassis', Math.round(60 / Math.max(1, fuelCount)), 0, Math.round(60 / Math.max(1, fuelCount)), 'Fuel Volume', 'Initial fuel volume'] : TABLE[name];
+    const known = name === '$fuel' && electricCount && !fuelCount ? ['range', 'kWh', 'Chassis', 60, 0, 60, 'Battery Level', 'Initial battery charge'] : name === '$fuel' ? ['range', 'L', 'Chassis', Math.round(fuelL / Math.max(1, fuelCount)), 0, Math.round(fuelL / Math.max(1, fuelCount)), 'Fuel Volume', 'Initial fuel volume'] : TABLE[name];
     if (known) variables.push([name, ...known]);
     else {
       unknownVariables.push(name);

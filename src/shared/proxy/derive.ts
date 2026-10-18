@@ -14,6 +14,8 @@ import { ATTACHMENT_VALUES, BEAM_PRESET_VALUES, type AttachmentStyle, type BeamP
 /** Positions with |x| below this are centre nodes (no l/r suffix). */
 const CENTRE_EPS = 1e-4;
 export const LIGHT_NODE_KG = 0.25;
+/** No generated node is lighter than this (see deriveStructure). */
+export const FLOOR_NODE_KG = 0.15;
 
 /**
  * Position tag inside node ids: the fore letter for front/rear and corner
@@ -311,7 +313,9 @@ export function deriveStructure(input: DeriveInput): DerivedStructure {
   const ids = nameNodes(mesh.positions, input.prefix, input.taken);
   const n = ids.length;
   const stiffeners = input.stiffenTowards ? stiffenerPositions(mesh.positions, input.stiffenTowards) : [];
-  const weight = n ? input.massKg / (n + stiffeners.length) : 0;
+  // A node lighter than this with the beams a part gets can't be stepped at 2000 Hz whatever the beams
+  // are softened to (a 0.3 kg reverse light's 0.04 kg nodes blew up): the part then weighs a little more than its spec.
+  const weight = n ? Math.max(FLOOR_NODE_KG, input.massKg / (n + stiffeners.length)) : 0;
   const warnings: string[] = [];
   if (n && weight < LIGHT_NODE_KG) warnings.push(`Nodes weigh ${weight.toFixed(2)} kg each (below ${LIGHT_NODE_KG} kg): raise the part's mass or lower its detail.`);
   const round = (v: number) => Math.round(v * 1e4) / 1e4 || 0; // no -0

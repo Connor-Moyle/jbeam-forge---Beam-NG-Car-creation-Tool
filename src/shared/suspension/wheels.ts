@@ -1,5 +1,6 @@
 import { isJbeamObject, type JbeamObject } from '../jbeam/parse';
 import { readTable } from '../jbeam/tables';
+import { slotRows } from './options';
 import { coordinate, definedNodes, variableDefaults, type V3 } from './transplant';
 
 /**
@@ -199,6 +200,36 @@ export function wheelSlotEnds(parts: Readonly<Record<string, JbeamObject>>): ('F
       }
     }
   return [...ends];
+}
+
+/**
+ * Fittings on an axle whose wheel end (front or rear wheel parts) an earlier axle already takes:
+ * they carry their own copies of their wheels, since the game builds each end's wheel parts once.
+ * sourceId → the wheel parts to copy: the picker's choices for its wheel slots, and the slots'
+ * own defaults (those the common zip has; a car's own wheel is in the set already).
+ */
+export function ownWheelFittings(
+  axles: readonly { fitted: { setId: string; sourceId: string; choices?: Record<string, { default: string; offer: string[] }> | undefined } | null; alternates?: readonly { setId: string; sourceId: string; choices?: Record<string, { default: string; offer: string[] }> | undefined }[] | undefined }[],
+  partsOf: (setId: string) => Readonly<Record<string, JbeamObject>> | undefined,
+): Map<string, string[]> {
+  const out = new Map<string, string[]>();
+  const taken = new Set<'F' | 'R'>();
+  for (const a of axles) {
+    const fits = [...(a.fitted ? [a.fitted] : []), ...(a.alternates ?? [])];
+    const ends = new Set<'F' | 'R'>();
+    for (const f of fits) {
+      const parts = partsOf(f.setId) ?? {};
+      const own = wheelSlotEnds(parts);
+      for (const e of own) ends.add(e);
+      if (!own.some((e) => taken.has(e))) continue;
+      const names = new Set<string>();
+      for (const [slot, c] of Object.entries(f.choices ?? {})) if (/^wheel_[FR]/i.test(slot)) for (const p of [c.default, ...c.offer]) if (p) names.add(p);
+      for (const p of Object.values(parts)) for (const r of slotRows(p)) if (/^wheel_[FR]/i.test(r.key) && r.def) names.add(r.def);
+      out.set(f.sourceId, [...names]);
+    }
+    for (const e of ends) taken.add(e);
+  }
+  return out;
 }
 
 export function wheelNames(parts: Readonly<Record<string, JbeamObject>>): string[] {

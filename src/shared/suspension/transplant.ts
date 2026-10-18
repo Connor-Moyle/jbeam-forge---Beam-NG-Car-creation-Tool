@@ -160,6 +160,44 @@ export interface TransplantInput {
   held?: readonly string[];
   /** Sideways stretch of the set about its centre line (new track ÷ its own): hubs, arms and wheel slots move out or in. 1 or unset: as the game made it. */
   lateral?: number;
+  /**
+   * The set carries its own copies of its wheels and tyres (an axle beyond the first of its end): their
+   * slot types and the hub nodes are renamed like everything else, so two axles of one end can't clash.
+   * Unset: the wheel slots stay the game's (every wheel of that lug count fits) and the hub nodes keep
+   * the names the game's wheel parts state.
+   */
+  ownWheels?: boolean;
+}
+
+/** A wheel or tyre slot type of the game's common parts (wheel_F_5, tire_R_15x7…). */
+const GAME_WHEEL_SLOT = /^(wheel|tire)_[FR](?:_|$)/i;
+
+/**
+ * The set's steering travel scaled by `k` (a twin-steer truck's second axle turns less): the
+ * `factor` of every steering hydro (hydros and torsionHydros rows that name a steeringWheelLock).
+ * 1 returns the parts as they are.
+ */
+export function scaleSteering(parts: Record<string, JbeamObject>, k: number): Record<string, JbeamObject> {
+  if (!(k >= 0) || k === 1) return parts;
+  const scaleDict = (d: JbeamObject): JbeamObject => (typeof d.factor === 'number' && 'steeringWheelLock' in d ? { ...d, factor: d.factor * k } : d);
+  const out: Record<string, JbeamObject> = {};
+  for (const [name, body] of Object.entries(parts)) {
+    let changed = false;
+    const copy: JbeamObject = { ...body };
+    for (const section of ['hydros', 'torsionHydros'] as const) {
+      const t = body[section];
+      if (!Array.isArray(t)) continue;
+      copy[section] = t.map((el) => {
+        if (isJbeamObject(el)) return scaleDict(el);
+        if (!Array.isArray(el)) return el;
+        const last = el[el.length - 1];
+        return isJbeamObject(last) ? [...el.slice(0, -1), scaleDict(last)] : el;
+      });
+      changed = true;
+    }
+    out[name] = changed ? copy : body;
+  }
+  return out;
 }
 
 /** Node groups a set makes: groups in its nodes tables, and the wheel groups its wheels create at spawn. */
@@ -278,6 +316,8 @@ const MOUNT_MIN_KG = 2;
 const MOUNT_RIGID_KG = 5;
 /** ω·Δt a bolted-on point is sized for: well inside the limit (the game's cars' median is 1.3). */
 const MOUNT_RATIO = 1.5;
+/** ω·Δt a set's own node may reach before it is given weight: a plain 2000 Hz solver fails from 2. */
+const PLAIN_LIMIT = 1.9;
 const MOUNT = { beamSpring: 6_000_000, beamDamp: 150, beamDeform: 120_000, beamStrength: 400_000 };
 
 /** Distance from p to the plane through a, b and c (∞ when they're in a line). */
@@ -300,6 +340,77 @@ export function shiftOffset(v: JbeamValue, d: number): JbeamValue {
   if (typeof v === 'string' && v.startsWith('$=')) return `$=(${v.slice(2)}) + ${d}`;
   if (typeof v === 'string' && v.startsWith('$')) return `$=${v} + ${d}`;
   return v;
+}
+
+/**
+ * Slot offsets baked into the parts: a part placed in a slot with a nodeOffset (the MD-Series' own
+ * wheel in its hub's wheel slot) states its nodes in the slot's frame, and the game moves them by the
+ * offset (x by the node's side, y and z as they are; a chain of slots adds up). Those nodes moved,
+ * and the offsets taken off the rows, so every reader of the set sees where the nodes really are:
+ * read as they came, the MD-Series' wheels sat 1.3 m in front of its axle and 0.5 m apart.
+ */
+export function bakeSlotOffsets(parts: Record<string, JbeamObject>): Record<string, JbeamObject> {
+  const vars = variableDefaults(Object.values(parts));
+  const out: Record<string, JbeamObject> = { ...parts };
+  const num = (v: JbeamValue | undefined) => {
+    const n = coordinate(v, vars);
+    return Number.isFinite(n) ? n : 0;
+  };
+  const shiftNodes = (name: string, d: V3) => {
+    const p = out[name];
+    if (!p || !Array.isArray(p.nodes) || !Array.isArray(p.nodes[0])) return;
+    const h = p.nodes[0].map(String);
+    const [ix, iy, iz] = [h.indexOf('posX'), h.indexOf('posY'), h.indexOf('posZ')];
+    if (ix < 0 || iy < 0 || iz < 0) return;
+    out[name] = {
+      ...p,
+      nodes: p.nodes.map((row, i) => {
+        if (i === 0 || !Array.isArray(row)) return row;
+        const r = [...row];
+        r[ix] = shiftOffset(r[ix] ?? 0, num(r[ix]) < 0 ? -d[0] : d[0]);
+        r[iy] = shiftOffset(r[iy] ?? 0, d[1]);
+        r[iz] = shiftOffset(r[iz] ?? 0, d[2]);
+        return r;
+      }),
+    };
+  };
+  const seen = new Set<string>();
+  const walk = (name: string, acc: V3) => {
+    if (seen.has(name)) return;
+    seen.add(name);
+    const p = out[name];
+    if (!p) return;
+    for (const table of ['slots', 'slots2'] as const) {
+      const t = p[table];
+      if (!Array.isArray(t) || !Array.isArray(t[0])) continue;
+      const h = t[0].map(String);
+      const defCol = h.indexOf('default');
+      const rows = t.map((row, i) => {
+        if (i === 0 || !Array.isArray(row)) return row;
+        const child = defCol >= 0 && typeof row[defCol] === 'string' ? (row[defCol]) : '';
+        const last = row[row.length - 1];
+        const o = isJbeamObject(last) && isJbeamObject(last.nodeOffset) ? last.nodeOffset : null;
+        const here: V3 = o ? [acc[0] + num(o.x), acc[1] + num(o.y), acc[2] + num(o.z)] : acc;
+        if (child && out[child]) {
+          if (here.some((v) => Math.abs(v) > 1e-9)) shiftNodes(child, here);
+          walk(child, here);
+        }
+        if (!o || !child || !out[child]) return row;
+        const { nodeOffset: _gone, ...rest } = last as JbeamObject;
+        return Object.keys(rest).length ? [...row.slice(0, -1), rest] : row.slice(0, -1);
+      });
+      out[name] = { ...out[name]!, [table]: rows };
+    }
+  };
+  const children = new Set<string>();
+  for (const p of Object.values(parts)) for (const table of ['slots', 'slots2'] as const) {
+    const t = p[table];
+    if (!Array.isArray(t) || !Array.isArray(t[0])) continue;
+    const defCol = t[0].map(String).indexOf('default');
+    for (const row of t.slice(1)) if (Array.isArray(row) && typeof row[defCol] === 'string') children.add(row[defCol]);
+  }
+  for (const name of Object.keys(parts)) if (!children.has(name)) walk(name, [0, 0, 0]);
+  return out;
 }
 
 /** A sideways coordinate stretched by `k` about the centre line; formulas and variables keep working ("$=(…) * k"). */
@@ -368,7 +479,7 @@ export function transplantSuspension(given: TransplantInput): TransplantResult {
   const warnings: string[] = [];
   const partNames = new Map(Object.keys(input.parts).map((n) => [n, `${input.partPrefix}${n}`]));
   const slotTypes = new Map<string, string>();
-  for (const body of Object.values(input.parts)) for (const st of slotTypesOf(body)) slotTypes.set(st, `${input.partPrefix}${st}`);
+  for (const body of Object.values(input.parts)) for (const st of slotTypesOf(body)) if (input.ownWheels || !GAME_WHEEL_SLOT.test(st)) slotTypes.set(st, `${input.partPrefix}${st}`);
   // Parts and slot types: one map (slot types often equal part names).
   const names = new Map([...slotTypes, ...partNames]);
 
@@ -378,7 +489,7 @@ export function transplantSuspension(given: TransplantInput): TransplantResult {
   // game's wheel parts: those parts state the same nodes again, by these names, to set the wheel's
   // offset. Renamed, an older car's set (the Covet's, the 200BX's) had two hubs a side, its arms on
   // one and the wheel between the two, and the wheel broke off at spawn.
-  const takesWheelParts = Object.values(input.parts).some((p) =>
+  const takesWheelParts = !input.ownWheels && Object.values(input.parts).some((p) =>
     (['slots', 'slots2'] as const).some((key) => {
       const t = p[key];
       if (!Array.isArray(t) || !Array.isArray(t[0])) return false;
@@ -675,6 +786,28 @@ export function transplantSuspension(given: TransplantInput): TransplantResult {
     }
     out[partNames.get(name)!] = part;
   }
+  // A node of the set past the plain-solver limit under its own beams and its bolts (the ETK 800's rear
+  // subframe centre: 4 kg under 70 MN/m, ω·Δt 2.09): the game's own solver takes it, a plain one at
+  // 2000 Hz blows up there. It gets the weight that puts it inside; the car is a few kilograms heavier.
+  const heldSpring = new Map<string, number>();
+  for (const h of heldMounts) heldSpring.set(h.node, (heldSpring.get(h.node) ?? 0) + h.spring * h.to.length);
+  const ballast = new Map<string, number>();
+  for (const id of own) {
+    const renamed = nodeIds.get(id) ?? id;
+    const k = (ownSpring.get(id) ?? 0) + (heldSpring.get(renamed) ?? 0);
+    const w = weights.get(id) ?? 25;
+    if (k > 0 && Math.sqrt(k / w) * STABILITY_DT > PLAIN_LIMIT) ballast.set(renamed, Math.ceil(k * (STABILITY_DT / PLAIN_LIMIT) ** 2 * 10) / 10);
+  }
+  if (ballast.size)
+    for (const part of Object.values(out)) {
+      if (!Array.isArray(part.nodes)) continue;
+      part.nodes = part.nodes.map((row) => {
+        if (!Array.isArray(row) || typeof row[0] !== 'string' || !ballast.has(row[0])) return row;
+        const last = row[row.length - 1];
+        const nodeWeight = ballast.get(row[0])!;
+        return isJbeamObject(last) ? [...row.slice(0, -1), { ...last, nodeWeight }] : [...row, { nodeWeight }];
+      });
+    }
   const rootName = partNames.get(input.root) ?? input.root;
   const root = out[rootName];
   if (root && extra.length) {

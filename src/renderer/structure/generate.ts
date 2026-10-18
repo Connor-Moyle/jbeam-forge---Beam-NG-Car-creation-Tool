@@ -13,12 +13,32 @@ import { buildProxy, type ProxyMode } from '@shared/proxy/build';
 import { meshoptReady } from '@shared/proxy/shapes';
 import { edges, reduceDense } from '@shared/proxy/mesh';
 import { defaultProxySettings, generateStructure, massNodeCap, partMass, partSettings, removePartStructure, type PartGeometry, type PartReport } from '@shared/proxy/generate';
-import { braces } from '@shared/proxy/derive';
+import { braces, placeRefNodes } from '@shared/proxy/derive';
+import { bodyPart } from '@shared/export/jbeam';
 import { wheelSpaceOf, type WheelSpace } from '@shared/proxy/wheelSpace';
 import { applyArchetype, ARCHETYPES } from '@shared/proxy/archetypes';
 import { kindDefaults, targetVertices } from '@shared/proxy/presets';
 
 const logger = rlog('generate');
+
+/**
+ * The body's refNodes placed again from its nodes (ref, back, left, up and the corners the game
+ * needs on the main part). Generate places them with the body; a body whose nodes came another way
+ * (the JBeam workspace, a car from the game, an older project) has none until this.
+ */
+export function placeBodyRefNodes(): boolean {
+  const doc = projectStore.getState().doc;
+  if (!doc) return false;
+  const body = bodyPart(doc, currentTaxonomy());
+  const placed = body ? placeRefNodes(doc.nodes.filter((n) => n.partId === body.id)) : null;
+  if (!placed) {
+    useUiStore.getState().pushStatus(body ? `${body.displayName} needs at least 6 nodes to place refNodes on: generate it first.` : 'No body shell, cab or frame to place refNodes on.', 'warning');
+    return false;
+  }
+  projectStore.getState().execute({ label: 'Place refNodes', apply: (d) => void (d.proxy.refNodes = placed) });
+  useUiStore.getState().pushStatus(`refNodes placed on ${body!.displayName}: ${placed.ref}, ${placed.back}, ${placed.left}, ${placed.up}.`, 'success');
+  return true;
+}
 
 /**
  * Proxy generation in the editor (SPEC §4.4): gathers each part's render

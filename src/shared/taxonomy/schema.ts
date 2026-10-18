@@ -17,6 +17,9 @@ import { z } from 'zod';
 export const POSITION_AXES = ['none', 'fr', 'lr', 'corner'] as const;
 export type PositionAxis = (typeof POSITION_AXES)[number];
 
+/** The kinds that carry a car with no body shell (a truck): a part of one of these is the parent of a part whose own ancestor kinds are missing, the cab first. */
+export const SHELL_KINDS = ['cab', 'frame'] as const;
+
 export const POSITIONS_BY_AXIS: Record<PositionAxis, readonly string[]> = {
   none: [],
   fr: ['F', 'R'],

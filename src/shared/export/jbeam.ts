@@ -1,7 +1,7 @@
 import type { Part, Project, RowOptions, StructBeam, StructNode, StructTri, TuningVar, PowertrainEdits } from '../project/schema';
 import { RESERVED } from '../jbeam/properties';
 import { triggerCorners, type Trigger } from '../triggers/schema';
-import type { TaxonomyEntry } from '../taxonomy/schema';
+import { SHELL_KINDS, type TaxonomyEntry } from '../taxonomy/schema';
 import { isJbeamObject, type JbeamObject, type JbeamValue } from '../jbeam/parse';
 import { serializeJbeam, JbeamComment, type WritableObject, type WritableValue } from '../jbeam/serialize';
 import { readTable, writeTable, type WritableRecord } from '../jbeam/tables';
@@ -12,14 +12,14 @@ import { beamPhysics, DEFORM_LIMIT_EXPANSION } from '../proxy/beamValues';
 import { couplerFor, type Hinge } from '../hinges/schema';
 import { hingeIds } from '../hinges/build';
 import { limiterBound } from '../hinges/geometry';
-import { definedNodes, definedWeights, setGroups, transplantSuspension } from '../suspension/transplant';
+import { bakeSlotOffsets, definedNodes, definedWeights, scaleSteering, setGroups, transplantSuspension } from '../suspension/transplant';
 import { blockNodes } from '../powertrain/placement';
 import { firstSlotType } from '../jbeam/slots';
 import { nodesTouchingOtherParts } from './contact';
 import { applyDrivelineEdits } from '../powertrain/driveline';
 import { exportableProps, propRow, PROPS_HEADER } from '../props/props';
 import type { PartScripts } from '../lua/export';
-import { applyDrivetrainToAxle, applyDrivetrainToGearbox, DEFAULT_DRIVETRAIN, planDrivetrain } from '../powertrain/drivetrain';
+import { applyDrivetrainToAxle, applyDrivetrainToGearbox, DEFAULT_DRIVETRAIN, planDrivetrain, renameClashingNames } from '../powertrain/drivetrain';
 import { camerasInternalSection } from '../cameras/cameras';
 import { applyChoices, type SetChoices, type SetOptions } from '../suspension/options';
 import { latchEvents, latchKindOf, resolveBlendTexts } from '../sound/blend';
@@ -58,6 +58,11 @@ export interface JbeamExportOptions {
   glowMap?: Readonly<Record<string, { simpleFunction: JbeamValue; off: string; on: string }>>;
   /** Fitted suspensions' jbeam (by catalogue set id), brought over into the mod. */
   suspensions?: Readonly<Record<string, SuspensionSetData>>;
+  /**
+   * By fitting (its sourceId): the game's wheel and tyre parts an axle beyond the first of its end
+   * carries as its own copies (ownWheelFittings), so two axles of one end can't clash in the game.
+   */
+  wheelParts?: Readonly<Record<string, Readonly<Record<string, JbeamObject>>>>;
   /** Vehicle scripts' controller rows and sections, by carrier part id. */
   scripts?: ReadonlyMap<string, PartScripts>;
   /** Told how the car was kept stable at the game's physics rate. */
@@ -192,7 +197,8 @@ export function slotTypeOf(parts: readonly Part[], part: Part): string {
 /** The body: the root-kind base part (the taxonomy root), else the first top-level base part. */
 export function bodyPart(doc: Pick<Doc, 'parts'>, tax: TaxonomyLookup): Part | undefined {
   const bases = doc.parts.filter((p) => !p.variantOf);
-  return bases.find((p) => tax.entry(p.taxonomyId)?.parent === null) ?? bases.find((p) => !p.parentPartId);
+  // A truck has no body shell: its frame (or cab) carries the car.
+  return bases.find((p) => tax.entry(p.taxonomyId)?.parent === null) ?? [...SHELL_KINDS].reverse().map((k) => bases.find((p) => p.taxonomyId === k)).find(Boolean) ?? bases.find((p) => !p.parentPartId);
 }
 
 /**
@@ -517,18 +523,31 @@ export function buildJbeamFiles(fullDoc: Doc, tax: TaxonomyLookup, opts: JbeamEx
     const b = bodyPart(doc, tax);
     return b ? (flexGroupOf(doc, b) ?? undefined) : undefined;
   })();
-  const bring = (setId: string, sourceId: string, tag: string, target: readonly { id: string; pos: [number, number, number] }[], tuning: Record<string, number>, slotRewrites?: Record<string, { slotType: string; part: string }>, edits?: PowertrainEdits, choices?: SetChoices, driveline?: PowertrainEdits, linkedNodes?: Record<string, string>, lateral?: number) => {
-    const found = opts.suspensions?.[setId];
-    if (!found) return null;
+  // Wheel and powertrain device names the axles before the one being brought already use (each is built once by the game).
+  const usedNames = new Set<string>();
+  const bring = (setId: string, sourceId: string, tag: string, target: readonly { id: string; pos: [number, number, number] }[], tuning: Record<string, number>, slotRewrites?: Record<string, { slotType: string; part: string }>, edits?: PowertrainEdits, choices?: SetChoices, driveline?: PowertrainEdits, linkedNodes?: Record<string, string>, lateral?: number, axle?: { steer?: number | undefined; used: ReadonlySet<string>; names: Set<string> }) => {
+    const got = opts.suspensions?.[setId];
+    if (!got) return null;
+    // An axle beyond the first of its end carries its own copies of its wheels and tyres.
+    const ownWheels = opts.wheelParts?.[sourceId];
+    const found = ownWheels ? { ...got, parts: { ...got.parts, ...ownWheels } } : got;
     // The game's other parts the user chose, then the engine and gearbox builders' changes, onto the game's parts before they're renamed.
-    const chosen = applyChoices(found, found.options, choices);
+    const picked = applyChoices(found, found.options, choices);
+    // Parts the choices brought in may sit in slots with an offset too (already baked ones have none left).
+    const chosen = { ...picked, parts: bakeSlotOffsets(picked.parts) };
     const edited = edits ? { ...chosen, parts: applyPowertrainEdits(chosen.parts, chosen.root, edits) } : chosen;
-    const data = driveline ? { ...edited, parts: applyDrivelineEdits(edited.parts, driveline) } : edited;
+    const driven = driveline ? { ...edited, parts: applyDrivelineEdits(edited.parts, driveline) } : edited;
+    let data = driven;
+    if (axle) {
+      const unique = renameClashingNames(scaleSteering(driven.parts, axle.steer ?? 1), axle.used, tag);
+      for (const n of unique.names) axle.names.add(n);
+      data = { ...driven, parts: unique.parts };
+    }
     const meshNames: Record<string, string> = {};
     for (const [key, name] of opts.meshNames) if (key.startsWith(`${sourceId}:`) && !key.includes('/')) meshNames[key.slice(sourceId.length + 1)] = name;
     const offset = fullDoc.sources?.find((s) => s.id === sourceId)?.placement.position ?? [0, 0, 0];
     // Every engine shares the e_ node names (only one is fitted at a time), so the gearbox fits whichever is chosen.
-    const t = transplantSuspension({ parts: data.parts, root: data.root, anchors: data.anchors, offset, partPrefix: `${slug}_${tag}_`, nodePrefix: `${tag.startsWith('E') ? 'e' : tag.toLowerCase()}_`, target, meshNames, tuning, slotRewrites, linkedNodes, fallbackGroup: bodyGroup, held: found.held, lateral });
+    const t = transplantSuspension({ parts: data.parts, root: data.root, anchors: data.anchors, offset, partPrefix: `${slug}_${tag}_`, nodePrefix: `${tag.startsWith('E') ? 'e' : tag.toLowerCase()}_`, target, meshNames, tuning, slotRewrites, linkedNodes, fallbackGroup: bodyGroup, held: found.held, lateral, ownWheels: !!ownWheels });
     for (const [name, content] of Object.entries(t.parts)) files.push({ file: `${name}.jbeam`, part: name, text: serializeJbeam({ [name]: content }) });
     foreign.push(...Object.values(t.parts));
     return t;
@@ -546,15 +565,19 @@ export function buildJbeamFiles(fullDoc: Doc, tax: TaxonomyLookup, opts: JbeamEx
   }
   (fullDoc.axles ?? []).forEach((axle, i) => {
     if (!axle.fitted) return;
-    const t = bring(axle.fitted.setId, axle.fitted.sourceId, axleTag(i), mountNodes, axle.tuning, undefined, undefined, axle.fitted.choices, axle.edits, blockOfEngine, axle.fitted.track ? axle.track / axle.fitted.track : undefined);
+    // This axle's suspensions (one is installed at a time) share names freely; they avoid the earlier axles'.
+    const names = new Set<string>();
+    const unique = { steer: axle.steer, used: new Set(usedNames), names };
+    const t = bring(axle.fitted.setId, axle.fitted.sourceId, axleTag(i), mountNodes, axle.tuning, undefined, undefined, axle.fitted.choices, axle.edits, blockOfEngine, axle.fitted.track ? axle.track / axle.fitted.track : undefined, unique);
     if (!t) return;
     axleSets.push({ index: i, t });
     // The other suspensions for this axle fill the same slot: the player (or a configuration) picks one.
     const tags = axleTags(axle, i);
     const others = (axle.alternates ?? []).flatMap((alt) => {
-      const a = bring(alt.setId, alt.sourceId, tags.get(alt.sourceId) ?? `${axleTag(i)}2`, mountNodes, axle.tuning, undefined, undefined, alt.choices, axle.edits, blockOfEngine, alt.track ? axle.track / alt.track : undefined);
+      const a = bring(alt.setId, alt.sourceId, tags.get(alt.sourceId) ?? `${axleTag(i)}2`, mountNodes, axle.tuning, undefined, undefined, alt.choices, axle.edits, blockOfEngine, alt.track ? axle.track / alt.track : undefined, unique);
       return a ? [a.rootSlotType] : [];
     });
+    for (const n of names) usedNames.add(n);
     extraSlots.push([t.rootSlotType, [t.rootSlotType, ...others], [], t.rootPart, `${axle.name} suspension`]);
     // The user's own meshes ride on the set's nodes (every node group the set's meshes used).
     const own = axle.ownMeshes.filter((k) => opts.meshNames.has(k) && !fullDoc.ignoredMeshes.includes(k)).map((k) => opts.meshNames.get(k)!);
@@ -872,6 +895,7 @@ export function buildJbeamFiles(fullDoc: Doc, tax: TaxonomyLookup, opts: JbeamEx
   const extra = mainAdditions(
     files.filter((f) => f.part !== slug).map((f) => f.text),
     !!pt?.engine && !!opts.suspensions?.[pt.engine.setId],
+    pt?.fuelL,
   );
   const mainPart = main[slug] as WritableObject;
   if (extra.controller) mainPart.controller = extra.controller;

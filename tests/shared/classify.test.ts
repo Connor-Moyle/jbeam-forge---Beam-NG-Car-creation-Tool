@@ -135,6 +135,16 @@ describe('proposeParts', () => {
     // foglight_L (side) must not attach to bumper_R because "R" there is rear, not right: front wins the tie
     expect(partOf('car_foglight_L')?.parentPartId).toBe(partOf('car_bumper_F')?.id);
   });
+
+  it('hangs a truck’s doors on its cab when it has no body shell (and its cab on the frame)', () => {
+    const truck = proposeParts(['cab', 'chassis_frame', 'door_FL', 'fuel_tank_L'].map((n) => ({ key: n, name: n })), classifier);
+    const part = (name: string) => truck.parts.find((p) => p.id === truck.assignments[name]);
+    expect(part('door_FL')?.parentPartId).toBe(part('cab')?.id);
+    expect(part('cab')?.parentPartId).toBe(part('chassis_frame')?.id);
+    expect(part('fuel_tank_L')?.parentPartId).toBe(part('cab')?.id);
+    // The shells stay roots: no loop (frame → cab → frame hung the Scene tree).
+    expect(part('chassis_frame')?.parentPartId).toBeNull();
+  });
 });
 
 describe('game-rip and Blender naming (a converted car with mixed conventions)', () => {

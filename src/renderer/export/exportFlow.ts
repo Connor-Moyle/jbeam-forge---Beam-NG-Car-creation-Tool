@@ -15,6 +15,7 @@ import { DEFAULT_SETTINGS, type Settings } from '@shared/settings-schema';
 import { currentTaxonomy } from '@renderer/parts/taxonomy';
 import type { ExportBundle, PublishListing } from '@shared/ipc-contract';
 import { bodyPart, buildJbeamFiles, damagedMaterialName, nodesExported, SET_KINDS } from '@shared/export/jbeam';
+import { placeRefNodes } from '@shared/proxy/derive';
 import type { Project } from '@shared/project/schema';
 import { buildGlowMap, lightFunction, onMaterialName } from '@shared/export/lights';
 import { loadFittedSets, useSetData, useSuspensionCatalogue } from '@renderer/suspension/commands';
@@ -34,7 +35,7 @@ import { textureToDds, toBase64 } from './textureConvert';
 import { portedIssues, portedText } from '@shared/export/ported';
 import { installProblems } from '@shared/export/installCheck';
 import { stampGameVersion } from './gameVersion';
-import { setWheels, wheelNames, wheelSlotEnds } from '@shared/suspension/wheels';
+import { setWheels, wheelNames } from '@shared/suspension/wheels';
 import { archWarning, nodesFoulingTyres } from '@shared/suspension/arch';
 import { suspensionLoadWarning } from '@shared/suspension/load';
 import { jbeamMaterialRefs } from '@shared/export/materialRefs';
@@ -107,10 +108,19 @@ function base64FromDataUrl(url: string): string {
 
 /** Build everything (no side effects) and validate it. */
 export function prepareExport(): PreparedExport | null {
-  const doc = projectStore.getState().doc;
-  if (!doc) return null;
-  const slug = doc.meta.slug;
+  const saved = projectStore.getState().doc;
+  if (!saved) return null;
   const tax = currentTaxonomy();
+  // refNodes are placed when the body is generated; a body whose nodes came another way (the JBeam
+  // workspace, a car brought in from the game, an older project) has none, and the export was blocked
+  // for it. Placed from the body's nodes here instead.
+  const doc = ((): typeof saved => {
+    if (saved.proxy.refNodes) return saved;
+    const body = bodyPart(saved, tax);
+    const refNodes = body ? placeRefNodes(saved.nodes.filter((n) => n.partId === body.id)) : null;
+    return refNodes ? { ...saved, proxy: { ...saved.proxy, refNodes } } : saved;
+  })();
+  const slug = doc.meta.slug;
   const author = useSettingsStore.getState().settings?.author || doc.meta.author;
   const sources = Object.values(useSceneStore.getState().sources);
   const formatOf = new Map(doc.sources.map((s) => [s.id, s.format]));
@@ -230,7 +240,7 @@ export function prepareExport(): PreparedExport | null {
     materialJsonAll[damagedMaterialName(name)] = dmg;
   }
   const meshMaterials = new Map(daeMeshes.map((dm) => [dm.name, dm.materials]));
-  const jbeams = buildJbeamFiles(doc, tax, { meshNames, author, suspensions: useSetData.getState().data, glowMap, meshMaterials, scripts: scripts.parts });
+  const jbeams = buildJbeamFiles(doc, tax, { meshNames, author, suspensions: useSetData.getState().data, wheelParts: useSetData.getState().wheelParts, glowMap, meshMaterials, scripts: scripts.parts });
   const root = `vehicles/${slug}`;
   // The default configuration, then every one made in the Configurations panel: a .pc, its info and a preview each.
   const configs = [null, ...doc.configs];
@@ -316,28 +326,14 @@ export function prepareExport(): PreparedExport | null {
     const text = archWarning(a.name.replace(/ axle$/i, '').toLowerCase(), set, set.tyre, inside);
     if (text) report.warnings.push({ code: 'TYRE_IN_STRUCTURE', message: text });
   }
-  // Two axles whose suspensions make wheels of the same name (a rear suspension on the front axle,
-  // a trailer's axle, which calls its wheels front ones): the game builds one wheel from both and
-  // the car comes apart at the hubs.
-  for (const [i, a] of fittedAxles.entries())
-    for (const b of fittedAxles.slice(i + 1)) {
-      const pa = useSetData.getState().data[a.fitted!.setId]?.parts ?? {};
-      const pb = useSetData.getState().data[b.fitted!.setId]?.parts ?? {};
-      const wa = wheelNames(pa);
-      let shared = wheelNames(pb).filter((w) => wa.includes(w));
-      // Or both take the same end's wheel parts, which make the same wheel nodes.
-      if (!shared.length) {
-        const ea = wheelSlotEnds(pa);
-        shared = wheelSlotEnds(pb).filter((e) => ea.includes(e)).map((e) => (e === 'F' ? 'FR, FL' : 'RR, RL'));
-      }
-      if (!shared.length) continue;
-      const end = (x: typeof a) => x.name.replace(/ axle$/i, '').toLowerCase();
-      // Rear wheel names on both: the front one is the odd one out; front names: the rear one.
-      const odd = shared.every((w) => /^R/i.test(w)) ? (/rear/i.test(a.name) ? b : a) : /front/i.test(a.name) ? b : a;
-      report.errors.push({
-        code: 'SUSPENSION_SAME_WHEELS',
-        message: `${a.fitted!.name} (${end(a)} axle) and ${b.fitted!.name} (${end(b)} axle) both make the wheels ${shared.join(', ')}, and the game can only build each wheel once. Fit a suspension made for the ${end(odd)} of a car on the ${end(odd)} axle.`,
-      });
+  // Two axles of one end (a twin-steer truck's, a tandem's): the later one carries its own copies of
+  // its wheels and tyres, under its own names, so the game builds each wheel once. A word on it.
+  for (const a of fittedAxles)
+    for (const s of [a.fitted!, ...(a.alternates ?? [])]) {
+      const own = useSetData.getState().wheelParts[s.sourceId];
+      if (!own) continue;
+      const copied = Object.keys(own).length;
+      report.warnings.push({ code: 'OWN_WHEELS', message: `${s.name} on the ${a.name.replace(/ axle$/i, '').toLowerCase()} axle is another axle of the same end as one before it, so it carries its own wheels (${copied ? `${copied} of the game's wheel and tyre parts copied in` : 'its own car’s'}): in the game its wheel slot offers only those, not every wheel of that lug count. Pick its wheels in the Wheels picker.` });
     }
   // An electric motor through a gearbox with a clutch (a manual's, or a dual-clutch's): the game's
   // clutch needs a combustion engine's inertia, and the car can't start (it came apart in testing;

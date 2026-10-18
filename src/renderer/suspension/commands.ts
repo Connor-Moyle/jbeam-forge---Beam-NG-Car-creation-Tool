@@ -17,8 +17,10 @@ import { defaultSettings, stageImport } from '@renderer/import/pipeline';
 import { cornerTargets } from '@renderer/objects/placeObject';
 import { assignToNewPart } from '@renderer/parts/commands';
 import { IDENTITY_EDIT } from '@shared/mesh/meshEdit';
-import { setTrack, setWheels } from '@shared/suspension/wheels';
+import { ownWheelFittings, setTrack, setWheels } from '@shared/suspension/wheels';
+import { bakeSlotOffsets } from '@shared/suspension/transplant';
 import { axleTags } from '@shared/export/jbeam';
+import type { JbeamObject } from '@shared/jbeam/parse';
 
 /**
  * Suspension workshop (Phase 10): the car's axles, and complete suspensions
@@ -35,13 +37,15 @@ export const useSuspensionCatalogue = create<{ sets: SuspensionSet[] | null; loa
 }));
 
 /** Sets' jbeam and attachment points, loaded on demand (the exporter and the tuning page read them). */
-export const useSetData = create<{ data: Record<string, SuspensionSetData>; ensure: (ids: readonly string[]) => Promise<void> }>()((set, get) => ({
+export const useSetData = create<{ data: Record<string, SuspensionSetData>; /** By fitting (sourceId): the game's wheel parts an axle beyond the first of its end carries as its own copies. */ wheelParts: Record<string, Record<string, JbeamObject>>; ensure: (ids: readonly string[]) => Promise<void> }>()((set, get) => ({
   data: {},
+  wheelParts: {},
   ensure: async (ids) => {
     const missing = ids.filter((id) => !get().data[id]);
     for (const id of missing) {
       const d = await call('suspension:set', { id });
-      if (d) set((s) => ({ data: { ...s.data, [id]: d } }));
+      // Nodes of parts in slots with an offset (the MD-Series' wheels) moved to where the game puts them.
+      if (d) set((s) => ({ data: { ...s.data, [id]: { ...d, parts: bakeSlotOffsets(d.parts) } } }));
     }
   },
 }));
@@ -59,6 +63,11 @@ export async function loadFittedSets(): Promise<void> {
     ...(doc?.panel ? [doc.panel.setId] : []),
   ];
   if (ids.length) await useSetData.getState().ensure(ids);
+  // Axles beyond the first of their end: the game's wheels they carry as their own copies.
+  const own = ownWheelFittings(doc?.axles ?? [], (id) => useSetData.getState().data[id]?.parts);
+  const wheelParts: Record<string, Record<string, JbeamObject>> = {};
+  for (const [sourceId, names] of own) wheelParts[sourceId] = names.length ? await call('beamng:wheelParts', { names }).catch(() => ({})) : {};
+  useSetData.setState({ wheelParts });
   // The catalogue too: the export's checks read each set's car, its weight and its tyres from it,
   // and it was only loaded once the Suspension tab had been opened.
   if (ids.length) await useSuspensionCatalogue.getState().load().catch(() => undefined);
@@ -78,9 +87,9 @@ export const useSuspensionUi = create<{ axleId: string | null; optionAxleId: str
   wheels: (wheelId) => set({ wheelId, axleId: null, optionAxleId: null, tuneId: null, driveId: null }),
 }));
 
-/** Which sets suit an axle: front sets for the first, rear for the others; "any" fits both. */
-export function axleKind(axles: readonly Axle[], axle: Axle): 'front' | 'rear' {
-  return axles[0]?.id === axle.id ? 'front' : 'rear';
+/** Which sets suit an axle: front (steered) sets for one that steers, rear for the others; "any" fits both. */
+export function axleKind(_axles: readonly Axle[], axle: Axle): 'front' | 'rear' {
+  return axle.steered ? 'front' : 'rear';
 }
 
 const newId = () => `axle_${crypto.randomUUID().slice(0, 8)}`;

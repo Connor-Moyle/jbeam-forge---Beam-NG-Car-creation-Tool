@@ -1,4 +1,4 @@
-import type { PositionAxis, TaxonomyEntry } from './schema';
+import { SHELL_KINDS, type PositionAxis, type TaxonomyEntry } from './schema';
 import { commonPrefix, tokenize, type Tokenized } from './tokenize';
 import { placement, positionCompat } from './positions';
 
@@ -280,6 +280,11 @@ export function proposeParts(meshes: readonly MeshRef[], classifier: Classifier)
         }
       }
       kind = classifier.entry(kind)?.parent ?? null;
+    }
+    // No ancestor kind among the parts (a truck has a cab and a frame, no body shell): the shell it has.
+    if (!p.parentPartId && classifier.entry(p.taxonomyId)?.parent && !(SHELL_KINDS as readonly string[]).includes(p.taxonomyId)) {
+      const shell = SHELL_KINDS.map((k) => bases.find((b) => b.taxonomyId === k && b !== p)).find(Boolean);
+      if (shell) p.parentPartId = shell.id;
     }
   }
   return { parts, assignments, unassigned, lowConfidence };

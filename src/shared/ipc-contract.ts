@@ -324,6 +324,8 @@ export interface InvokeContract {
   'beamng:horns': { req: undefined; res: { part: string; label: string }[] };
   /** The game's wheels (every wheel part in vehicles/common), for the wheel picker. */
   'beamng:wheels': { req: undefined; res: GameWheel[] };
+  /** The named common wheel parts with the tyres their slots fit, by name (for an axle that carries its own copies of its wheels). */
+  'beamng:wheelParts': { req: { names: string[] }; res: Record<string, JbeamObject> };
   /** Pick the user's own engine recordings (ogg, wav, flac); their folder is granted for the export's copy. */
   'dialog:pickAudioFiles': { req: undefined; res: string[] };
   /** Material names in the game's vehicle zips (fork), for using a stock material by name. */
@@ -438,6 +440,7 @@ export const INVOKE_CHANNELS = [
   'beamng:soundFile',
   'beamng:horns',
   'beamng:wheels',
+  'beamng:wheelParts',
   'dialog:pickAudioFiles',
   'dialog:pickDirectory',
   'import:pickSource',

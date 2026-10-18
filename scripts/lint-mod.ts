@@ -247,7 +247,8 @@ for (const m of daeMaterials) if (!mapped.has(m.toLowerCase()) && !gameMaterials
 for (const [name, m] of Object.entries(mats)) {
   for (const stage of m.Stages)
     for (const [k, v] of Object.entries(stage)) {
-      if (!k.endsWith('Map') || typeof v !== 'string') continue;
+      // A "@name" map is a texture the game makes at run time (a head unit's screen), never a file.
+      if (!k.endsWith('Map') || typeof v !== 'string' || v.startsWith('@')) continue;
       const file = join(root, ...v.replace(/^\//, '').split('/'));
       if (!existsSync(file) && !gameFiles.has(stem(v))) errors.push(`material ${name}: ${k} ${v} does not exist`);
     }

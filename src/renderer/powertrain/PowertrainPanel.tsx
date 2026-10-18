@@ -1,6 +1,9 @@
 import { startPlacing } from '@renderer/scene/placeFitted';
 import { useEffect } from 'react';
-import { Cog, Gauge, Move, Wrench } from 'lucide-react';
+import { Cog, Fuel, Gauge, Move, Wrench } from 'lucide-react';
+import { DEFAULT_FUEL_L } from '@shared/export/drivable';
+import { Field } from '@renderer/ui/components/Field';
+import { NumberInput } from '@renderer/ui/components/NumberInput';
 import type { SuspensionSet } from '@shared/ipc-contract';
 import type { FittedSet } from '@shared/project/schema';
 import type { EngineSpecs } from '@shared/powertrain/specs';
@@ -8,7 +11,7 @@ import { useProjectStore } from '@renderer/app/stores/project';
 import { Button } from '@renderer/ui/components/Button';
 import { ScrollArea } from '@renderer/ui/components/ScrollArea';
 import { SetPicker, TuningView } from '@renderer/workshop/WorkshopUi';
-import { addEngineOption, fitPowertrain, makeDefaultEngine, removeEngineOption, removePowertrain, setPowertrainChoices, setPowertrainTuning, usePowertrainCatalogue, usePowertrainUi, type PowertrainKind } from './commands';
+import { addEngineOption, fitPowertrain, makeDefaultEngine, removeEngineOption, removePowertrain, setFuelCapacity, setPowertrainChoices, setPowertrainTuning, usePowertrainCatalogue, usePowertrainUi, type PowertrainKind } from './commands';
 import { useUnits } from '@renderer/settings/useUnits';
 import styles from '@renderer/workshop/Workshop.module.css';
 import { EngineBuilder, GearboxBuilder } from './Builder';
@@ -86,6 +89,18 @@ export function PowertrainPanel() {
         {powertrain?.engine && <EngineOptions alternates={powertrain.alternates ?? []} />}
         <Card kind="gearbox" fitted={powertrain?.gearbox ?? null} />
         <DrivetrainCard />
+        {powertrain?.engine && (
+          <section className={styles.card} data-testid="fuel-card">
+            <header className={styles.axleHead}>
+              <strong>
+                <Fuel aria-hidden className={styles.icon} /> Fuel
+              </strong>
+            </header>
+            <Field label="Fuel capacity" hint="What the tank holds (a car 40–80 L, a truck 300 L and more); shared between the tanks when several engines are fitted">
+              <NumberInput aria-label="Fuel capacity" value={powertrain.fuelL ?? DEFAULT_FUEL_L} onChange={(v) => setFuelCapacity(v === DEFAULT_FUEL_L ? null : v)} min={1} max={5000} step={5} precision={0} unit="L" />
+            </Field>
+          </section>
+        )}
         {sets && sets.length === 0 && <p className={styles.note}>No engines or gearboxes yet: they come from your BeamNG.drive install. Set its folder in Settings.</p>}
         <p className={styles.note}>The gearbox bolts to the engine&rsquo;s transmission slot, so pick one that suits the engine&rsquo;s drive layout. Most suspensions bring their own differential; Drive shafts joins it to the gearbox, adds one (with half-shafts) for a driven axle that has none, and shows the whole line from the engine to the wheels.</p>
       </ScrollArea>

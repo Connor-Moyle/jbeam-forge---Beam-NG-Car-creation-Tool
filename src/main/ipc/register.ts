@@ -42,8 +42,10 @@ export function registerInvoke<C extends InvokeChannel>(
       return { ok: true, value };
     } catch (err) {
       const { message, stack } = describeError(err);
-      logger.error(`${channel} failed after ${(performance.now() - started).toFixed(1)}ms:`, message, stack ?? '');
       const code = (err as { code?: unknown }).code;
+      // A content repository with nothing of that kind yet, no network, GitHub's rate limit: the app says so on screen; not a fault.
+      if (code === 'NOT_FOUND' || code === 'NETWORK' || code === 'RATE_LIMIT') logger.warn(`${channel} failed after ${(performance.now() - started).toFixed(1)}ms:`, message);
+      else logger.error(`${channel} failed after ${(performance.now() - started).toFixed(1)}ms:`, message, stack ?? '');
       return { ok: false, error: typeof code === 'string' ? { message, code } : { message } };
     }
   });

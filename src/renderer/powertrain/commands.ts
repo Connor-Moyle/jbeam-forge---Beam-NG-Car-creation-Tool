@@ -507,6 +507,18 @@ export function startEngineOptionSync(): void {
   sync();
 }
 
+/** The car's fuel capacity in litres (null: the default, 60). */
+export function setFuelCapacity(litres: number | null): void {
+  projectStore.getState().execute({
+    label: 'Change fuel capacity',
+    coalesce: 'fuel',
+    apply: (d) => {
+      if (litres === null || !(litres > 0)) delete d.powertrain.fuelL;
+      else d.powertrain.fuelL = Math.round(litres);
+    },
+  });
+}
+
 /** How the gearbox reaches the axles (drive shafts). */
 export function setDrivetrain(patch: Partial<DrivetrainSettings>): void {
   projectStore.getState().execute({

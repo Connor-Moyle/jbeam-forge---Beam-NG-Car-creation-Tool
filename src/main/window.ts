@@ -1,6 +1,6 @@
 import { join } from 'node:path';
 import { pathToFileURL } from 'node:url';
-import { BrowserWindow, session, shell } from 'electron';
+import { app, BrowserWindow, session, shell } from 'electron';
 import { WINDOW_BACKGROUND } from '@shared/window-chrome';
 import { scoped } from './log';
 
@@ -56,6 +56,8 @@ export function createMainWindow(opts: WindowOptions): BrowserWindow {
     show: false,
     backgroundColor: WINDOW_BACKGROUND,
     title: 'JBeam Forge',
+    // The installed app takes its icon from its exe; a dev or harness run (electron.exe) showed Electron's atom.
+    ...(app.isPackaged ? {} : { icon: join(app.getAppPath(), 'build', 'icon.png') }),
     webPreferences: {
       preload: join(__dirname, '../preload/index.cjs'),
       sandbox: true,

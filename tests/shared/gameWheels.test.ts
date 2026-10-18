@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import type { JbeamObject } from '../../src/shared/jbeam/parse';
 import { applyChoices, slotRows } from '../../src/shared/suspension/options';
 import { gameWheelInfo, gameWheelLabel, setWheelSlot } from '../../src/shared/wheels/game';
+import { ownWheelFittings } from '../../src/shared/suspension/wheels';
 
 const bruckell: JbeamObject = {
   information: {
@@ -38,5 +39,25 @@ describe('the game’s wheel parts', () => {
     expect(slotRows(out.parts.car_hub_F)[0]!.def).toBe('bruckell_wheel_02a_18x8_F');
     // A choice the options don't know (made before the game was scanned) still switches the default.
     expect(slotRows(applyChoices(data, undefined, { wheel_F_5: { default: 'other_wheel_F', offer: [] } }).parts.car_hub_F)[0]!.def).toBe('other_wheel_F');
+  });
+});
+
+describe('axles beyond the first of their end carry their own wheels', () => {
+  const front = { s: { slots2: [['name', 'allowTypes', 'denyTypes', 'default', 'description'], ['wheel_F_5', ['wheel_F_5'], [], 'wheel_01a_F', 'Front Wheels']] } };
+  const rear = { s: { slots2: [['name', 'allowTypes', 'denyTypes', 'default', 'description'], ['wheel_R_5', ['wheel_R_5'], [], 'steel_R', 'Rear Wheels']] } };
+  const partsOf = (id: string) => (id === 'front' ? front : rear);
+  it('names the wheels to copy for the second axle of an end: the picker’s choices and the slot’s default', () => {
+    const own = ownWheelFittings(
+      [
+        { fitted: { setId: 'front', sourceId: 'a' } },
+        { fitted: { setId: 'front', sourceId: 'b', choices: { wheel_F_5: { default: 'wheel_09a_F', offer: ['wheel_03a_F'] } } } },
+        { fitted: { setId: 'rear', sourceId: 'c' }, alternates: [{ setId: 'rear', sourceId: 'c2' }] },
+        { fitted: { setId: 'rear', sourceId: 'd' } },
+      ],
+      partsOf,
+    );
+    expect([...own.keys()]).toEqual(['b', 'd']);
+    expect(own.get('b')).toEqual(['wheel_09a_F', 'wheel_03a_F', 'wheel_01a_F']);
+    expect(own.get('d')).toEqual(['steel_R']);
   });
 });

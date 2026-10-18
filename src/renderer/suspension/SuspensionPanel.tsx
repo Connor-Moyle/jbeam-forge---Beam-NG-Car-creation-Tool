@@ -9,6 +9,7 @@ import { useSceneStore } from '@renderer/app/stores/scene';
 import { Button } from '@renderer/ui/components/Button';
 import { EmptyState } from '@renderer/ui/components/EmptyState';
 import { Field } from '@renderer/ui/components/Field';
+import { Input } from '@renderer/ui/components/Input';
 import { NumberInput } from '@renderer/ui/components/NumberInput';
 import { ScrollArea } from '@renderer/ui/components/ScrollArea';
 import { Toggle } from '@renderer/ui/components/Toggle';
@@ -90,7 +91,7 @@ function AxleCard({ axle }: { axle: Axle }) {
   return (
     <section className={styles.card} data-testid="axle-card">
       <header className={styles.axleHead}>
-        <strong>{axle.name}</strong>
+        <Input value={axle.name} onChange={(e) => updateAxle(axle.id, { name: e.target.value.slice(0, 40) || axle.name })} aria-label="Axle name" title="Its name in the parts menu (Front steer, Second steer, Rear drive…)" />
         <Button icon={Trash2} size="sm" variant="ghost" onClick={() => removeAxle(axle.id)} aria-label={`Remove ${axle.name}`} />
       </header>
       <div className={styles.axleFields}>
@@ -101,6 +102,11 @@ function AxleCard({ axle }: { axle: Axle }) {
           <NumberInput aria-label="Track width" value={axle.track} onChange={(track) => updateAxle(axle.id, { track })} step={0.01} min={0.3} max={4} precision={3} unit="m" />
         </Field>
         <Toggle checked={axle.steered} onChange={(steered) => updateAxle(axle.id, { steered })} label="Steers" />
+        {axle.steered && (
+          <Field label="Steering range" hint="Its suspension's steering travel, scaled: a twin-steer truck's second axle turns less">
+            <NumberInput aria-label="Steering range" value={Math.round((axle.steer ?? 1) * 100)} onChange={(v) => updateAxle(axle.id, { steer: v === 100 ? undefined : v / 100 })} step={5} min={0} max={300} precision={0} unit="%" />
+          </Field>
+        )}
       </div>
       {axle.fitted ? (
         <>

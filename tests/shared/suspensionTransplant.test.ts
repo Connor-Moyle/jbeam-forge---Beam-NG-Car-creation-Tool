@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { JbeamObject } from '@shared/jbeam/parse';
-import { bakeComponents, definedNodes, externalNodeRefs, planeDistance, setGroups, shiftOffset, slender, thickness, transplantSuspension, tuningVariables, type V3 } from '@shared/suspension/transplant';
+import { bakeComponents, bakeSlotOffsets, definedNodes, externalNodeRefs, planeDistance, scaleSteering, setGroups, shiftOffset, slender, thickness, transplantSuspension, tuningVariables, type V3 } from '@shared/suspension/transplant';
 
 const PARTS: Record<string, JbeamObject> = {
   car_suspension_F: {
@@ -570,5 +570,70 @@ describe('component switches (the Sunburst rally arms)', () => {
     const t = transplantSuspension({ parts, root: 'car_susp_F', anchors: {}, offset: [0, 0, 0], partPrefix: 'mod_F_', nodePrefix: 'f_', target: [], meshNames: {}, tuning: {} });
     expect(JSON.stringify(t.parts.mod_F_car_susp_F!.nodes)).toContain('"nodeWeight":2');
     expect(bakeComponents('$= $foo + 1')).toBe('$= $foo + 1');
+  });
+});
+
+describe('an axle beyond the first of its end (a twin-steer truck, a tandem)', () => {
+  const parts: Record<string, JbeamObject> = {
+    car_susp_R: {
+      slotType: 'car_susp_R',
+      slots2: [['name', 'allowTypes', 'denyTypes', 'default', 'description'], ['wheel_R_5', ['wheel_R_5'], [], 'wheel_01a_R', 'Rear Wheels']],
+      nodes: [['id', 'posX', 'posY', 'posZ'], ['rw1l', 0.7, 1.3, 0.3], ['rw1r', -0.7, 1.3, 0.3]],
+      hydros: [['id1:', 'id2:'], ['rw1l', 'rw1r', { factor: 0.2, steeringWheelLock: 600 }]],
+      torsionHydros: [['id1:', 'id2:', 'id3:', 'id4:'], { factor: -0.5, steeringWheelLock: 720 }, ['rw1l', 'rw1r', 'rw1l', 'rw1r']],
+    },
+    wheel_01a_R: { slotType: 'wheel_R_5', pressureWheels: [['name', 'hubGroup', 'group', 'node1:', 'node2:'], ['RL', 'x', 'y', 'rw1l', 'rw1l']] },
+  };
+  const bring = (ownWheels: boolean) => transplantSuspension({ parts, root: 'car_susp_R', anchors: {}, offset: [0, 0, 0], partPrefix: 'mod_R2_', nodePrefix: 'r2_', target: [], meshNames: {}, tuning: {}, ownWheels });
+
+  it('keeps the game’s wheel slot and hub node names as it comes, so every wheel of that lug count fits', () => {
+    const t = bring(false);
+    expect(t.parts.mod_R2_wheel_01a_R!.slotType).toBe('wheel_R_5');
+    expect(JSON.stringify(t.parts.mod_R2_car_susp_R!.nodes)).toContain('"rw1l"');
+  });
+
+  it('with its own wheels, renames the wheel slot and the hub nodes like everything else', () => {
+    const t = bring(true);
+    expect(t.parts.mod_R2_wheel_01a_R!.slotType).toBe('mod_R2_wheel_R_5');
+    expect(JSON.stringify(t.parts.mod_R2_car_susp_R!.nodes)).toContain('"r2_rw1l"');
+    expect(JSON.stringify(t.parts.mod_R2_car_susp_R!.slots2)).toContain('"mod_R2_wheel_R_5"');
+    expect(JSON.stringify(t.parts.mod_R2_wheel_01a_R!.pressureWheels)).toContain('"r2_rw1l"');
+  });
+
+  it('scales the steering travel of every kind of steering hydro', () => {
+    const s = scaleSteering(parts, 0.5);
+    const hydros = JSON.stringify(s.car_susp_R!.hydros);
+    expect(hydros).toContain('"factor":0.1');
+    expect(JSON.stringify(s.car_susp_R!.torsionHydros)).toContain('"factor":-0.25');
+    expect(scaleSteering(parts, 1)).toBe(parts);
+    expect(JSON.stringify(parts.car_susp_R!.hydros)).toContain('"factor":0.2');
+  });
+});
+
+describe('a part in a slot with a node offset (the MD-Series’ own wheel in its hub’s wheel slot)', () => {
+  it('moves its nodes to where the game puts them (x by the node’s side) and takes the offset off the row', () => {
+    const parts: Record<string, JbeamObject> = {
+      hub: { slotType: 'hub', slots2: [['name', 'allowTypes', 'denyTypes', 'default', 'description'], ['wheel_slot', ['wheel_slot'], [], 'wheel', 'Wheels', { nodeOffset: { x: '$=$trackoffset_F+0.215', y: -1.273, z: 0.43 } }]], variables: [['name', 'type', 'unit', 'category', 'default', 'min', 'max', 'title', 'description'], ['$trackoffset_F', 'range', 'm', 'Wheels', 0, -0.02, 0.05, 'Offset', '']] },
+      wheel: { slotType: 'wheel_slot', nodes: [['id', 'posX', 'posY', 'posZ'], ['fw1l', 0.32, 0, 0], ['fw1r', -0.32, 0, 0]] },
+    };
+    const baked = bakeSlotOffsets(parts);
+    expect([...definedNodes(baked.wheel!)]).toEqual([['fw1l', [0.535, -1.273, 0.43]], ['fw1r', [-0.535, -1.273, 0.43]]]);
+    expect(JSON.stringify(baked.hub!.slots2)).not.toContain('nodeOffset');
+    expect(JSON.stringify(parts.wheel!.nodes)).toContain('0.32,0,0');
+    expect(bakeSlotOffsets(baked).wheel).toEqual(baked.wheel);
+  });
+});
+
+describe('a set node past the plain-solver limit (the ETK 800’s rear subframe centre)', () => {
+  it('is given the weight that puts it inside, and the rest are left as they are', () => {
+    const parts: Record<string, JbeamObject> = {
+      s: { slotType: 's', nodes: [['id', 'posX', 'posY', 'posZ'], { nodeWeight: 4 }, ['c', 0, 1.25, 0.68], ['a', 0.3, 1.2, 0.5], ['b', -0.3, 1.2, 0.5]], beams: [['id1:', 'id2:'], { beamSpring: 35_000_000 }, ['c', 'a'], ['c', 'b']] },
+    };
+    const t = transplantSuspension({ parts, root: 's', anchors: {}, offset: [0, 0, 0], partPrefix: 'm_', nodePrefix: 'r_', target: [], meshNames: {}, tuning: {} });
+    const rows = (t.parts.m_s!.nodes as unknown[][]).filter((r) => typeof r[0] === 'string');
+    const c = rows.find((r) => r[0] === 'r_c')!;
+    // 70 MN/m on 4 kg is ω·Δt 2.09; at 1.9 it needs 4.9 kg.
+    expect((c[c.length - 1] as { nodeWeight: number }).nodeWeight).toBe(4.9);
+    expect(rows.find((r) => r[0] === 'r_a')!.length).toBe(4);
   });
 });

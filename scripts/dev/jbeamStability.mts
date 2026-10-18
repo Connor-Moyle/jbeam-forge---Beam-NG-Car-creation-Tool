@@ -33,7 +33,7 @@ for (const name of chosen) {
   if (!p) continue;
   if (p.nodes) for (const r of readTable(p.nodes).records) {
     const id = String(r.values.id);
-    nodes.set(id, { id, pos: [num(r.values.posX), num(r.values.posY), num(r.values.posZ)], weight: Number(r.options.nodeWeight ?? 25), part: name });
+    nodes.set(id, { id, pos: [num(r.values.posX), num(r.values.posY), num(r.values.posZ)], weight: num(r.options.nodeWeight ?? 25), part: name });
   }
   if (p.beams) for (const r of readTable(p.beams).records) {
     beams.push({ a: String(r.values['id1:']), b: String(r.values['id2:']), spring: Number(r.options.beamSpring ?? 4_300_000), damp: Number(r.options.beamDamp ?? 580), part: name, type: String(r.options.beamType ?? '|NORMAL') });
@@ -107,7 +107,17 @@ console.log(problems.length ? `${problems.length} problems:\n  ` + problems.slic
   const A = Int32Array.from(bs.map((b) => index.get(b.a)!));
   const B = Int32Array.from(bs.map((b) => index.get(b.b)!));
   const K = Float64Array.from(bs.map((b) => b.spring));
-  const C = Float64Array.from(bs.map((b) => b.damp));
+  // Damping as the game applies it: a node's beams together never take more in one step than would
+  // reverse its velocity (seven stock subframe bushings at 2000 Ns/m on a 4.5 kg node ran away in a
+  // plain scheme; the game runs that part). Each node's damping is scaled down to that, per beam the
+  // smaller of its two ends' factors.
+  const dampSum = new Float64Array(n);
+  for (const b of bs) {
+    dampSum[index.get(b.a)!]! += b.damp;
+    dampSum[index.get(b.b)!]! += b.damp;
+  }
+  const dampFactor = (i: number) => Math.min(1, m[i]! / (dampSum[i]! * DT || 1e-9));
+  const C = Float64Array.from(bs.map((b) => b.damp * Math.min(dampFactor(index.get(b.a)!), dampFactor(index.get(b.b)!))));
   const L = Float64Array.from(bs.map((_, k) => Math.hypot(x[A[k]! * 3]! - x[B[k]! * 3]!, x[A[k]! * 3 + 1]! - x[B[k]! * 3 + 1]!, x[A[k]! * 3 + 2]! - x[B[k]! * 3 + 2]!)));
   const f = new Float64Array(n * 3);
   const steps = Number(process.env.STEPS ?? 4000);
@@ -138,7 +148,17 @@ console.log(problems.length ? `${problems.length} problems:\n  ` + problems.slic
         v[i * 3 + 1]! *= 0.9;
       }
       const sp = Math.hypot(v[i * 3]!, v[i * 3 + 1]!, v[i * 3 + 2]!);
-      if (!(sp < 200)) blew = `${ids[i]} (${nodes.get(ids[i]!)!.part}) at ${(s * DT).toFixed(4)} s, ${sp.toFixed(0)} m/s`;
+      if (!(sp < 200) && !blew) {
+        blew = `${ids[i]} (${nodes.get(ids[i]!)!.part}) at ${(s * DT).toFixed(4)} s, ${sp.toFixed(0)} m/s`;
+        // What drove it: its beams by the force they carry right now, with how far each is from its rest length.
+        const rows = bs.map((b, k) => ({ b, k })).filter(({ k }) => A[k] === i || B[k] === i).map(({ b, k }) => {
+          const a = A[k]! * 3, c = B[k]! * 3;
+          const len = Math.hypot(x[c]! - x[a]!, x[c + 1]! - x[a + 1]!, x[c + 2]! - x[a + 2]!);
+          return { b, len, stretch: len - L[k]!, force: Math.abs(K[k]! * (len - L[k]!)), other: ids[A[k] === i ? B[k]! : A[k]!]!, k: K[k]!, c: C[k]!, w: m[A[k] === i ? B[k]! : A[k]!]! };
+        }).sort((p, q) => q.force - p.force).slice(0, 8);
+        console.log(`  ${ids[i]} weighs ${m[i]} kg; its beams at the blow-up:`);
+        for (const r of rows) console.log(`    ${r.b.type.trim()} to ${r.other} (${r.w} kg): k ${r.k} c ${r.c} rest ${L[bs.indexOf(r.b)]!.toFixed(3)} now ${r.len.toFixed(3)} (${(r.stretch * 1000).toFixed(0)} mm) force ${r.force.toExponential(2)}`);
+      }
     }
   }
   console.log(blew ? `RUN: blew up — ${blew}` : `RUN: ${steps} steps (${(steps * DT).toFixed(1)} s) stable`);

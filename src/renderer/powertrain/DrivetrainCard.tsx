@@ -1,6 +1,7 @@
 import { useEffect, useMemo } from 'react';
 import { Waypoints } from 'lucide-react';
-import { CENTRE_DIFFS, DEFAULT_DRIVETRAIN, DRIVE_LAYOUTS, planDrivetrain, type DrivetrainSettings } from '@shared/powertrain/drivetrain';
+import { CENTRE_DIFFS, DEFAULT_DRIVETRAIN, DRIVE_LAYOUTS, planDrivetrain, uniqueAxleParts, type DrivetrainSettings } from '@shared/powertrain/drivetrain';
+import { axleTag } from '@shared/export/jbeam';
 import { EMPTY_ARR } from '@shared/empty';
 import { useProjectStore } from '@renderer/app/stores/project';
 import { useSetData } from '@renderer/suspension/commands';
@@ -28,10 +29,14 @@ export function DrivetrainCard() {
   }, [ids]);
   const settings: DrivetrainSettings = pt?.drivetrain ?? DEFAULT_DRIVETRAIN;
   const plan = useMemo(() => {
-    const fitted = axles.flatMap((a, index) => {
-      const set = a.fitted ? data[a.fitted.setId] : undefined;
-      return set ? [{ index, name: a.name, y: a.y, parts: set.parts }] : [];
-    });
+    // Names made unique across axles as the export does (a truck with the same rear axle twice).
+    const fitted = uniqueAxleParts(
+      axles.flatMap((a, index) => {
+        const set = a.fitted ? data[a.fitted.setId] : undefined;
+        return set ? [{ index, name: a.name, y: a.y, parts: set.parts }] : [];
+      }),
+      (i) => axleTag(i),
+    );
     if (!fitted.length) return null;
     const engine = pt?.engine ? (data[pt.engine.setId]?.parts ?? null) : null;
     const gearbox = pt?.gearbox ? (data[pt.gearbox.setId]?.parts ?? null) : null;

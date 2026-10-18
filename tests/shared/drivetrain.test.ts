@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { JbeamObject } from '../../src/shared/jbeam/parse';
-import { applyDrivetrainToAxle, applyDrivetrainToGearbox, planDrivetrain, powertrainRows } from '../../src/shared/powertrain/drivetrain';
+import { applyDrivetrainToAxle, applyDrivetrainToGearbox, planDrivetrain, powertrainRows, uniqueAxleParts } from '../../src/shared/powertrain/drivetrain';
 
 const H = ['type', 'name', 'inputName', 'inputIndex'];
 const ENGINE: Record<string, JbeamObject> = { eng: { powertrain: [H, ['combustionEngine', 'mainEngine', 'dummy', 0]] } };
@@ -151,5 +151,20 @@ describe('drive shafts', () => {
   it('warns when two axles have the same devices', () => {
     const plan = planDrivetrain({ engine: ENGINE, gearbox: BOX, axles: [{ index: 0, name: 'Rear 1', y: 1, parts: axle('R', 'driveshaft') }, { index: 1, name: 'Rear 2', y: 2, parts: axle('R', 'driveshaft') }] });
     expect(plan.problems.some((p) => /Rear 1 and Rear 2 both have a device named differential_R/.test(p))).toBe(true);
+  });
+});
+
+describe('the same suspension on two axles (a truck’s tandem)', () => {
+  it('gives the later axle’s wheels and devices their own names, wherever they are named', () => {
+    const rear = { ...axle('R', 'driveshaft'), hubs: { pressureWheels: [['name', 'hubGroup'], ['RL', 'x'], ['RR', 'x']], powertrain: [H, ['shaft', 'halfRL', 'differential_R', 1, { connectedWheel: 'RL' }]] } };
+    const [a, b] = uniqueAxleParts([{ parts: rear }, { parts: rear }], (i) => (i ? 'R2' : 'R'));
+    expect(JSON.stringify(a!.parts)).toBe(JSON.stringify(rear));
+    const text = JSON.stringify(b!.parts);
+    expect(text).toContain('"differential_R_R2"');
+    expect(text).toContain('"RL_R2"');
+    expect(text).toContain('"connectedWheel":"RL_R2"');
+    expect(text).not.toContain('"RL"');
+    const plan = planDrivetrain({ engine: ENGINE, gearbox: BOX, axles: [{ index: 0, name: 'Rear', y: 1, parts: a!.parts }, { index: 1, name: 'Rear 2', y: 2, parts: b!.parts }] });
+    expect(plan.problems.filter((p) => /device named/.test(p))).toEqual([]);
   });
 });

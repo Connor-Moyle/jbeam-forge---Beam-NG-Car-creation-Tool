@@ -1,6 +1,6 @@
 import type { Part, PartProxy, Project, StructNode } from '../project/schema';
 import { projectedArea } from './layout';
-import type { TaxonomyEntry } from '../taxonomy/schema';
+import { SHELL_KINDS, type TaxonomyEntry } from '../taxonomy/schema';
 import { materialDefaults } from '../parts/materials';
 import { bindable, buildProxy } from './build';
 import { orientOpenAway } from './quality';
@@ -315,7 +315,8 @@ export function generateStructure(doc: Doc, tax: TaxonomyLookup, geometries: rea
   }
 
   // refNodes follow the body (placed once, or re-placed when the body regenerates).
-  const body = doc.parts.find((p) => tax.entry(p.taxonomyId)?.parent === null && !p.variantOf);
+  // A truck has no body shell: its frame (then cab) carries the refNodes.
+  const body = doc.parts.find((p) => tax.entry(p.taxonomyId)?.parent === null && !p.variantOf) ?? [...SHELL_KINDS].reverse().map((k) => doc.parts.find((p) => p.taxonomyId === k && !p.variantOf)).find(Boolean);
   if (body && (regenerated.has(body.id) || !doc.proxy.refNodes)) {
     doc.proxy.refNodes = placeRefNodes(doc.nodes.filter((n) => n.partId === body.id));
   }

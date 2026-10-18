@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
-import { Eraser, Wand2 } from 'lucide-react';
+import { Crosshair, Eraser, Wand2 } from 'lucide-react';
+import { bodyPart } from '@shared/export/jbeam';
 import { useProjectStore } from '@renderer/app/stores/project';
 import { useTaxonomy } from '@renderer/parts/taxonomy';
 import { Badge } from '@renderer/ui/components/Badge';
@@ -17,7 +18,7 @@ import { PROXY_MODES } from '@shared/proxy/build';
 import { massNodeCap, partMass, partRole, partSettings } from '@shared/proxy/generate';
 import { materialDefaults } from '@shared/parts/materials';
 import { partReportCard } from '@shared/structure/reportCard';
-import { clearStructure, generateParts, previewCounts, updateProxySettings, useStructureUi } from './generate';
+import { clearStructure, generateParts, placeBodyRefNodes, previewCounts, updateProxySettings, useStructureUi } from './generate';
 import styles from './StructureSection.module.css';
 
 const MODE_LABELS: Record<(typeof PROXY_MODES)[number], string> = { surface: 'Surface (even spacing)', decimate: 'Decimate (shell)', hull: 'Convex hull', box: 'Box (PCA fit)', cylinder: 'Cylinder (PCA fit)' };
@@ -27,6 +28,7 @@ const BRACING_LABELS: Record<(typeof BRACING_DENSITIES)[number], string> = { non
 /** Inspector section: how this part's jbeam structure is generated (SPEC §4.4). */
 export function StructureSection({ part }: { part: Part }) {
   const tax = useTaxonomy();
+  const isBody = useProjectStore((s) => (s.doc ? bodyPart(s.doc, tax)?.id === part.id : false));
   const entry = tax.entry(part.taxonomyId);
   const proxy = useProjectStore((s) => s.doc?.proxy);
   const nodeCount = useProjectStore((s) => s.doc?.nodes.reduce((n, x) => n + (x.partId === part.id ? 1 : 0), 0) ?? 0);
@@ -117,7 +119,7 @@ export function StructureSection({ part }: { part: Part }) {
       </div>
       <div className={styles.row}>
         <Field label="Target mass" hint={<AutoHint custom={settings.massKg !== null} auto="From type × material" onReset={() => set({ massKg: null })} />}>
-          <NumberInput value={mass} onChange={(v) => set({ massKg: v })} min={0.05} max={5000} step={0.5} precision={2} unit="kg" />
+          <NumberInput value={mass} onChange={(v) => set({ massKg: v })} min={0.05} max={5000} step={0.5} precision={2} unit="kg" aria-label="Target mass" />
         </Field>
         <Field label="Symmetry">
           <Toggle checked={settings.symmetry} onChange={(symmetry) => set({ symmetry })} label="Mirror l/r" />
@@ -183,6 +185,11 @@ export function StructureSection({ part }: { part: Part }) {
         {nodeCount > 0 && (
           <Button icon={Eraser} variant="ghost" onClick={() => clearStructure(part.id)}>
             Clear
+          </Button>
+        )}
+        {isBody && nodeCount > 0 && (
+          <Button icon={Crosshair} size="sm" onClick={() => placeBodyRefNodes()} title="The reference nodes the game needs on the main part (ref, back, left, up), placed again from this part's nodes. Generate places them too; a body whose nodes came another way has none until this." data-testid="structure-refnodes">
+            Place refNodes
           </Button>
         )}
       </div>

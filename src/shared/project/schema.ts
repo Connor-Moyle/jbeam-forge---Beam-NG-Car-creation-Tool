@@ -22,7 +22,7 @@ import { EngineDesignSchema } from '../powertrain/design';
  * may tighten the type without a migration; anything else needs one.
  */
 export const PROJECT_FORMAT = 'jbforge';
-export const CURRENT_PROJECT_VERSION = 27;
+export const CURRENT_PROJECT_VERSION = 28;
 
 export const SLUG_PATTERN = /^[a-z0-9]+(?:_[a-z0-9]+)*$/;
 
@@ -397,6 +397,8 @@ export const AxleSchema = z.object({
   /** Wheel centre to wheel centre, metres. */
   track: z.number().positive(),
   steered: z.boolean(),
+  /** Steering range (v28): a scale on the fitted suspension's steering travel (1 = as the game made it; twin front axles turn the second one less). */
+  steer: z.number().min(0).max(3).optional(),
   /** Tuning values for the fitted suspension's variables ($springheight_F…); unset = the game's default. */
   tuning: z.record(z.string(), z.number()),
   /** The user's own meshes shown for this suspension instead of the game's (the game's jbeam still does the physics). */
@@ -434,6 +436,8 @@ export const FittedSetSchema = z.object({
 export const PowertrainSchema = z.object({
   engine: FittedSetSchema.nullable(),
   gearbox: FittedSetSchema.nullable(),
+  /** The car's fuel capacity in litres (v28), shared between the tanks the engines ask for; absent = 60. */
+  fuelL: z.number().positive().max(5000).optional(),
   /** More engines (fork): offered in the engine's slot, one chosen per configuration; `engine` is the default. */
   alternates: z.array(FittedSetSchema).optional(),
   /** How the gearbox reaches the axles (fork): which are driven, and the centre differential for all-wheel drive. Absent = as the axles were. */
@@ -746,7 +750,12 @@ export const ProjectV27Schema = ProjectV26Schema.extend({
   formatVersion: z.literal(27),
 });
 
-export const ProjectSchema = ProjectV27Schema;
+/** v28: an axle's steering range (axle.steer) and the car's fuel capacity (powertrain.fuelL). */
+export const ProjectV28Schema = ProjectV27Schema.extend({
+  formatVersion: z.literal(28),
+});
+
+export const ProjectSchema = ProjectV28Schema;
 export type Project = z.infer<typeof ProjectSchema>;
 export type PartVersion = z.infer<typeof PartVersionSchema>;
 export type ProjectMeta = z.infer<typeof ProjectMetaSchema>;

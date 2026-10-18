@@ -21,6 +21,12 @@ describe('what a car’s main part must provide for borrowed game parts', () => 
     expect(a.variables.find((r) => r[0] === '$brakestrength')).toEqual(['$brakestrength', 'range', '', 'Brakes', 1, 0.6, 1, 'Brake Force Multiplier', 'Scales the overall brake torque for this setup']);
   });
 
+  it('shares the fuel capacity the project asks for between the tanks (a truck’s 800 L)', () => {
+    const a = mainAdditions([engine, brakes], true, 800);
+    expect(a.storages.fueltank_R).toMatchObject({ fuelCapacity: 400 });
+    expect(a.variables.find((r) => r[0] === '$fuel')).toEqual(['$fuel', 'range', 'L', 'Chassis', 400, 0, 400, 'Fuel Volume', 'Initial fuel volume']);
+  });
+
   it('adds nothing a part already provides', () => {
     const tank = t({ slotType: 'tank', energyStorage: [['type', 'name'], ['fuelTank', 'fueltank_R'], ['fuelTank', 'fueltank_L']], variables: [['name', 'type', 'unit', 'category', 'default', 'min', 'max', 'title', 'description'], ['$brakestrength', 'range', '', 'Brakes', 1, 0.6, 1, 'x', 'y'], ['$brakebias', 'range', '', 'Brakes', 0.7, 0, 1, 'x', 'y'], ['$revLimiterRPM', 'range', 'rpm', 'Engine', 7000, 1000, 9000, 'x', 'y']] });
     const ctrl = t({ slotType: 'body', controller: [['fileName'], ['vehicleController', {}]] });

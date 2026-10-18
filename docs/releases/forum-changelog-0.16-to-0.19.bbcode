@@ -1,0 +1,259 @@
+[SIZE=6][B]JBeam Forge: change list, 0.16.0 to 0.19.0[/B][/SIZE]
+
+[B]Downloads:[/B] [URL='https://github.com/Connor-Moyle/jbeam-forge---Beam-NG-Car-creation-Tool/releases']GitHub Releases[/URL] (Windows installer and portable exe, Linux .deb and AppImage, the Blender add-on, and JBeam Forge for inside the game). The installer updates any earlier version in place; your settings, projects and library stay.
+[B]Bugs:[/B] [URL='https://github.com/Connor-Moyle/jbeam-forge---Beam-NG-Car-creation-Tool/issues']GitHub Issues[/URL]
+
+Project formats: 0.16 saves v25, 0.17 v26, 0.18 v27, 0.19 v28. Every version opens older projects; an older version can't open a project saved by a newer one.
+
+[HR][/HR]
+
+[SIZE=5][B]0.19.0[/B][/SIZE] [I](coming next)[/I]
+
+[B]Trucks with any number of axles[/B]
+[LIST]
+[*][B]Add axle[/B] in the Suspension workspace puts another axle behind the last. Each has its position, a name (it names the slot in the parts menu: Front steer, Second steer, Rear drive…), its track, and [B]Steers[/B], which now decides which of the game's suspensions it is offered.
+[*]A third axle could not be exported before: the game's wheel parts state the same wheel nodes on every axle of one end, and the same suspension on two axles named its wheels and differentials twice.
+[*]An axle beyond the first of its end (a twin-steer truck's second front axle, a tandem's second drive axle) now carries its own copies of the wheels and tyres you picked for it, renamed with everything else, so the game can build every wheel. The export says so in a warning: that axle's slot offers those copies, not every wheel of the lug count.
+[*]The same game suspension on two axles gets its own wheel and drivetrain device names on the second (RL → RL_R2, differential_R → differential_R_R2), wherever its parts name them. The Drive shafts card shows the same names.
+[*]The Wheels picker puts matching wheels on every other axle with the same lugs, not just one.
+[*][B]Steering range[/B] on a steered axle scales its suspension's steering travel (every kind of steering hydro the game's cars use): a twin-steer truck's second axle at 60% turns less than the first. 0% leaves a steered suspension straight.
+[/LIST]
+
+[B]Fuel capacity[/B]
+[LIST]
+[*]The [B]Fuel[/B] card in the Engine workspace sets what the car's tank holds (60 L unless you say). Several engines fitted share it between the tanks they ask for. Before, every car carried 60 L.
+[/LIST]
+
+[B]Fixed[/B]
+[LIST]
+[*]A suspension whose own wheel part sits in a slot with a node offset (the MD-Series) was read with its wheels 1.3 m in front of the axle and 0.5 m apart, so it was placed a metre off and its track read as 0.97 m. Slot offsets are now baked into node positions when a set is read, for every such car.
+[*]A truck with a cab and a frame but no body shell left its doors with no parent part, so nothing could be hinged, and had no refNodes, so the export was blocked. Doors and the like now hang on the cab, and the frame carries the refNodes.
+[*]The Moving parts panel's animation suggestions read only the renamed mesh names, so a "speedo_needle" shown as "gauge_cluster_2" was never offered. They now read the name the mesh had in the file as well, and the game's suspension and engine meshes are left out of them (a steering knuckle is not a steering wheel).
+[*]Adding script templates whose default keys another script already uses gives them free keys (same modifier, next letter or digit). A car with every template had five pairs on one key.
+[*]Parts whose every mesh is set to Ignore no longer warn that they export as an empty slot option; they are left out of the mod.
+[*]The structure section's weight field and the axle's name can be set by their labels (accessibility).
+[/LIST]
+
+[B]Three more cars built through the app, start to finish[/B]
+[LIST]
+[*][B]Forge Hauler 8x8[/B]: a twin-steer heavy haulage truck with a sleeper cab, two saddle tanks and a belly tank (1200 L), on four of the MD-Series' axles (the second steer at 60%), with the D-Series desert axles as options and four engines (T-Series I6 and V8, MD-Series diesel, D-Series diesel V8). Long Haul, Heavy Tow (fifth wheel, ballast, winch bumper) and Expedition (bull bar, roof box, light bar, snorkel, spare) versions.
+[*][B]Forge Estate[/B]: a 1990s family wagon with four doors, a tailgate, sunroof, power windows and seats, on the ETK 800's suspension (the wide one and, at the front, the Vivace's rally as options), with four ETK engines. Base, Sport, Rally, Police and Taxi versions.
+[*][B]Forge Camper[/B]: a 1980s van conversion with a sliding door, a pop-top, a bed and a kitchen, on the H-Series' axles (4-link and heavy dually as options), with four H-Series engines. Camper, Cargo, Shuttle, Heavy Duty and Race versions.
+[*]The harness writes each out as a project (.jbforge) and as a mod (not part of the release). The build goes through everything the app can do: the parts' weights, the structure, every axle with the game's suspensions and their options, the wheel picker, engines and fuel, the horn, every opening panel hinged, every needle and pedal animated, scripted wipers, windows, mirrors, seats, sunroof and head unit plus every other script template, a handle on every door and a horn button, interior cameras, plates, hitch, nitrous, a paint design, factory paints, a tuning variable, the configurations, then save, export, lint and a 2000 Hz check of every configuration.
+[/LIST]
+
+[HR][/HR]
+
+[SIZE=5][B]0.18.0[/B][/SIZE] — the game's wheels, other suspensions per axle, two cars built start to finish
+
+[B]Wheel picker[/B]
+[LIST]
+[*]On a fitted axle, [B]Wheels[/B] lists every wheel in the game that fits its hubs: 435 for 5-lug hubs, by size (14″ to 26″), brand and name, with the game's price. Search by anything in the name.
+[*]The pick becomes the wheel the car comes with, its tyres follow, and the matching front or rear wheel goes on the other axle when it takes the same lugs.
+[*]The wheel slot stays the game's, so the whole range of that lug count is still in the parts menu in game. Before, a wheel chosen as a part option was copied into the mod and the slot took only the copies.
+[/LIST]
+
+[B]Other suspensions for an axle[/B]
+[LIST]
+[*][B]Add another suspension[/B] on a fitted axle puts a second (or third) game suspension in the same slot. Each configuration picks one, the player can swap them in the parts menu, and the fitted one stays the default.
+[*]Their parts export under their own names (F2, R2…), their wheels follow the axle's wheel pick, and the track you set on the axle widens or narrows each of them.
+[/LIST]
+
+[B]Two cars built through the app, start to finish[/B]
+[LIST]
+[*]The [B]Forge Crawler[/B] (a rock-crawling buggy with a removable top) and the [B]Forge GP60[/B] (an early-1960s style Grand Prix car), 76 and 64 named parts each, with variant parts for the versions a configuration can pick.
+[*]Built the way a user would: import and sort, Generate, axles with the Hopper's crawler live axles and the Bolide's race suspension plus the other suspensions each version picks, wheels from the picker, four engines each with the gearbox, a horn, hinged doors and lids, a tow hitch and nitrous, and four or five configurations (rock crawler, drift, trophy truck, race; grand prix, race, rally, drift, trophy), each with its own suspension, engine, sound, bumpers and parts.
+[*]The exported mods lint clean and hold together at 2000 Hz in every configuration.
+[/LIST]
+
+[B]Fixed[/B]
+[LIST]
+[*]A part whose meshes were all set to Ignore still went into the mod as an empty part, and showed up as a slot in every configuration.
+[*]The wheel picker's filters squeezed its list under the status bar on hubs with many brands.
+[*]A warning before export when an axle's track squeezes or stretches a fitted suspension (or one of its alternates) more than about 10% from its own width: the Sunburst's rally struts squeezed to 84% came apart at spawn.
+[*]A game suspension whose node weights switch on one of its own car's component flags (the Sunburst's rally arms) is written out with the value the game takes in a mod that declares no components, so the 2000 Hz check and other readers of the mod see a number, not a formula.
+[*]The 2000 Hz check reads formula node positions (the Autobello's hubs) with the parts' variable defaults, as the game does, instead of calling them not-a-number.
+[/LIST]
+
+[HR][/HR]
+
+[SIZE=5][B]0.17.2[/B][/SIZE] — generated parts laid out like the game's
+
+[LIST]
+[*]0.17.0 took the game's beam numbers from all 38 of its cars. This release takes its layouts too: every part of every car was measured for how many nodes it has for its size and how it hangs on its parent, and the generator follows that.
+[*][B]Node count from size.[/B] A door, hood, bumper, wing, spoiler, grille, light, seat or tank gets as many nodes as the game gives a part that size: a bumper went from 47 nodes per square metre to 29 (the game's is 25), a spoiler from 24 to 33 (35). The Detail slider still moves it, 0.6× to 1.4× around that.
+[*][B]Attachments like the game's.[/B] A panel hangs on 3 beams per attached node, on about three quarters of its nodes. Before, bumpers, grilles and spoilers hung on 2 beams on a third of their nodes, which is where a lot of "wonky" came from: a part held along one edge pivots about it.
+[*]Regenerate the structure of an older project to pick this up (Generate, then Export).
+[/LIST]
+Known: side skirts still come out denser than the game's (a long thin part is given extra nodes so the game can hang its mesh on it).
+
+[HR][/HR]
+
+[SIZE=5][B]0.17.1[/B][/SIZE] — Sound as a workspace, bumpers of their own, the stretched suspension on screen
+
+[LIST]
+[*][B]Sound is a workspace tab[/B] on the toolbar, after Engine (engine mods get it too). It was only a tab in the Properties column, which was easy to miss.
+[*][B]Bumpers have a beam preset of their own[/B]: stiffer and heavier than skirts and spoilers, as the game's are. Regenerate a bumper to pick it up.
+[*][B]The 3D view shows a fitted suspension stretched to the axle's track[/B], the way the export writes it; before, only the export moved.
+[*]The structure presets measured over all 38 cars in 0.17.0 are kept, with one correction: plastic panels and light mechanical parts keep their old stiffness (the game's would blow a thin skirt or a steering wheel up at spawn, since generated nodes are lighter than the game's) and take only the game's deform and strength.
+[/LIST]
+
+[HR][/HR]
+
+[SIZE=5][B]0.17.0[/B][/SIZE] — the Sound tab, track width, and structure numbers from every car in the game
+
+[B]The Sound tab[/B] (everything it sets is written into the mod's own files; the game's sounds are read, never changed)
+[LIST]
+[*][B]Engine voice.[/B] Which recordings the intake and the exhaust play: any of the game's engine sounds, or one of your own. Play it and sweep the revs to hear it.
+[*][B]My engine sounds.[/B] A pitched copy of a game sound (above 1 it sounds bigger and lazier, below 1 smaller and revvier), or a sound from your recordings (ogg, wav or flac, each a steady note at the revs in its file name, on or off throttle). The newer game sounds are synthesized in its audio bank and can't be copied, only mixed.
+[*][B]Engine mix.[/B] Intake and exhaust volume, on- and off-load volume, muffling, bass, treble, EQ, backfires, and the turbo's whine, hiss and blow-off. Each can be left adjustable in the game's tuning menu.
+[*][B]Gear whine[/B], down to silent.
+[*][B]Car.[/B] The horn (any of the game's), the latch recordings for doors, hood and boot, and how much the cabin muffles the outside.
+[*]Every exported car now has a horn. It had no horn slot before.
+[/LIST]
+
+[B]Track width[/B]
+[LIST]
+[*]The axle's Track field did nothing. Now fitting a game suspension sets Track to the set's own width, and changing it stretches the suspension sideways on export: hubs, arms and wheels move out or in together.
+[/LIST]
+
+[B]Structure numbers from every car in the game[/B]
+[LIST]
+[*]The generator's beam presets came from one car, the Sunburst. They are now the medians over all 38 drivable cars: the body shell is three times stronger than it was; trim (lights, mirrors, dashboards, exhausts) is as stiff and as strong as the game's instead of tearing off at a touch; bumpers, skirts and spoilers keep their stiffness but take the game's strength; glass is damped like the game's (25, not 250); engine blocks are 6M spring, not 15M.
+[*]Regenerate the structure of an older project to pick these up.
+[/LIST]
+
+[HR][/HR]
+
+[SIZE=5][B]0.16.0[/B][/SIZE] — inside BeamNG on F10, every game setting in reach, AI mode, and a download library
+
+[B]JBeam Forge inside BeamNG.drive[/B]
+[LIST]
+[*]Press [B]F10[/B] while driving and Forge opens over the game, the way the World Editor does on F11. Press F10 again to drive on.
+[*][B]The car I'm driving[/B] opens that car as a project with its current configuration: every part, node and beam as the game built it, its models and its materials.
+[*][B]On the car[/B] draws your project's structure on the car you're in. [B]Drive it[/B] installs your mod as it is now and spawns it, in the game's own physics.
+[*][B]Check[/B] unlatches and shuts every door and lid, drives the car round a skidpad, and runs it into a bollard at 50 km/h, then says pass or fail for each. The Test panel in the desktop app shows the last results.
+[*][B]Measure[/B] puts the car through the game's own performance tests on its test map: 0-100 km/h, top speed, braking and off-road. The figures show in the game's vehicle selector straight away, and the next export writes them into the mod.
+[*]Install it from Settings → BeamNG.drive → JBeam Forge in the game. It comes with the app and keeps itself at the same version.
+[/LIST]
+
+[B]What the game said[/B]
+[LIST]
+[*]Export, Test results or the command palette reads BeamNG's log after you've spawned the car and lists what went wrong with it, first causes first: missing parts, nodes, meshes, materials and variables, each with a button that jumps to the part in the editor.
+[*]Each project remembers the BeamNG version it was made for, and says so when you open it after a game update.
+[*]Export warns when another mod in your mods folder has a car folder with the same name (the game merges the two).
+[/LIST]
+
+[B]Every setting, and your own versions of parts[/B]
+[LIST]
+[*]Every setting of a fitted engine or gearbox has a game-pad button: press it to make that value adjustable in the game's tuning menu, between a lowest and highest you choose.
+[*][B]Make a version[/B] of any part of a fitted engine or gearbox: a race radiator with a bigger core and more coolant, a sport oil pan, a short-ratio gearbox. Each has its own name, price and values and shows up in the parts menu next to the original.
+[*]Cooling, oil, fuel and brake settings have proper names and ranges. [B]Advanced mode[/B] (Settings → General) lists every number the game's parts have.
+[*]Axles have a [B]Brakes & diff[/B] page: brake torque, handbrake, brake response and cooling, tyre pressure and ABS, as well as the differentials.
+[*]The engine builder has [B]Set the figures (advanced)[/B]: type the power, torque and rev limit you want, and the curve is reshaped to match.
+[/LIST]
+
+[B]Structure, checked against the game's own cars[/B]
+[LIST]
+[*]Each part's Structure section has a report card that compares its node weights, bracing, beam lengths and collision against the game's own cars, and says in plain words what to change when one is out of range.
+[*]Generated structure is built the way the game's own cars are, from measurements of eight of them: about the number of nodes the game gives that kind of part, each node about twice as heavy, with stiffer beams to match. The practice car went from 1,300 nodes to about 730.
+[/LIST]
+
+[B]AI mode[/B] (optional)
+[LIST]
+[*]Works with any AI you already use. Pick jobs (names and descriptions, prices, weights, structure, material looks, hinges and handles, scripts, configurations, vehicle details, engine and gearbox tune, tuning options), copy the request into ChatGPT, Copilot, Gemini, Claude or anything else, and paste the answer back. Every change is checked and listed before you apply it, and a round is one undo step. [B]Iterate[/B] asks again with your feedback.
+[*]No account and nothing to sign in to. Settings → AI mode can send requests for you with your own key, or to a free model on your own PC (Ollama, LM Studio).
+[/LIST]
+
+[B]Blender add-on[/B]
+[LIST]
+[*]In the sidebar (N): pick a part type, position and variant and it names the selected meshes the way JBeam Forge reads them (mycar_door_FL, mycar_bumper_race_F), with extra pieces of a part numbered so they stay one part. [B]Export for JBeam Forge[/B] writes the model; import it once and every save in Blender updates the car in JBeam Forge with your parts kept.
+[/LIST]
+
+[B]Downloads in one library, Linux, help[/B]
+[LIST]
+[*]Materials, meshes and scripts come from one public library that rebuilds itself whenever something is added. Settings → Downloads → Publishing adds materials, scripts and finished folders and publishes them from inside the app.
+[*]JBeam Forge runs on Linux (.deb and AppImage). It finds BeamNG.drive whether you play the native Linux build or the Windows one through Proton, and installs JBeam Forge in the game into whichever you play. On Windows, a moved BeamNG user folder is found by itself.
+[*]A [B]Reference[/B] section in the Help centre covers every part of the app, and every tutorial is listed step by step in the order a mod comes together.
+[*]More to start from: 76 material presets (with a Wraps & special group), 16 more engine designs (from a kei three to a W16, diesel and electric), classic, service and fleet paints, seven more vehicle scripts (gauge needle, trip computer, central locking, daytime running lights, low-fuel warning, seatbelt reminder, gear display), three more example extensions.
+[*]New scripts: Traction control, Stability control and Drive modes (Eco, Comfort, Sport).
+[*]File → Export Model writes FBX, OBJ, STL, PLY, glTF, .glb and .dae, with the game's fitted parts where they stand on the car.
+[/LIST]
+
+[B]Before you export[/B]
+[LIST]
+[*]Export warns about a suspension under a car much heavier or lighter than the one it came from, tyres that sit inside your car's own structure, a fitted engine bigger than your car's own engine model, and more nodes, beams, triangles or meshes than the heaviest of the game's own cars.
+[*]Export stops, with an explanation, for an electric motor behind a gearbox with a clutch, two axles whose suspensions make the same wheels, and an engine whose power never reaches a wheel.
+[/LIST]
+
+[SPOILER="0.16.0: cars that spawn whole (the fixes, tested by building one body with the front suspension, rear suspension, engine and gearbox of 24 of the game's cars in turn and spawning each in BeamNG.drive 0.39: all 24 spawn steady and drive)"]
+[LIST]
+[*]Borrowed suspension parts whose own nodes all sit at one height (the Autobello's tie rods, several lower arms and limit straps) stretched or failed to load ("VY node not found"). They now also take the new car's body.
+[*]A borrowed suspension, engine or gearbox could bolt onto whatever part of your car was nearest, including the doors, the hood or an engine block. They now bolt only to the body and its structure.
+[*]Where your body had no node close to a borrowed suspension's mounting point, several mounting points were pulled onto the same body node. Each now stays where the suspension needs it and is bolted to the body around it.
+[*]Parts of a borrowed suspension that its own car's body also held (the Autobello's front crossmember node) swung free; they're now bolted to the new body as well. Bolts are sized to the node's weight.
+[*]Some game parts check whether a setting exists at all (the Barstow's rear track width). Export no longer gives those a value, which moved the Barstow's rear wheels a metre out.
+[*]The second of two doors that share a node prefix was exported without its latch, so it hung open. Both doors now latch.
+[*]Parts tucked against each other (a grille behind the bumper, headlights in their housings) pushed themselves apart at spawn. Nodes that start against another part's surface now stay out of self-collision.
+[*]A gearbox from one car fitted to another car's engine could tie its stiffest beams to a tiny exhaust node. Parts now attach to the nearest node heavy enough to hold them.
+[*]A suspension that brings its own wheel (the Covet three-wheeler's tractor wheel) now brings that wheel along.
+[*]A tandem rear axle (the dump truck's) with a front suspension was refused as if it covered both ends. It's now allowed.
+[*]A gearbox's launch and shift revs are brought into the fitted engine's range. A race gearbox behind a low-revving diesel waited for revs the engine never reached.
+[*]Panels wrapped in a hull are built as two mirrored halves, so left and right nodes match exactly.
+[*]A long thin part (a grille, a side skirt) gets enough nodes for the game to hang its mesh on.
+[*]Thin panels (bonnet, boot lid, doors, roof) get stiffener nodes on their inner side, tied to the skin all round, the way the game's own panels are built. A bonnet sagged into the engine bay before.
+[*]Nodes of one part are kept at least 4 cm apart (9 cm on a thin panel). A mesh hung on nodes a few millimetres apart tore into spikes.
+[*]A hinged part's hinge and latch nodes are no longer in the group its meshes are hung on (the skin tore there).
+[*]Beams are softened less to keep a car stable: the limit is set from the game's own cars, measured over 50,000 of their nodes.
+[*]The hub nodes of a fitted suspension keep the game's names, so the game's wheel parts land on them.
+[*]With one of the game's engines fitted, your car's own engine model becomes a light shell that collides with nothing, and the engine is kept below the top of your own engine model.
+[*]The sandbox can crash the car from behind, sideways into a pole, drop it on its roof, and run a wall crash at five speeds in a row.
+[*]The command palette can start the whole car's structure as a hatchback, coupé, saloon, pickup, truck or trailer.
+[*]A bonnet or boot lid is pushed open with a little more than its own weight when unlatched.
+[*]The Suspension tab can work a fitted suspension through its travel on a rig: how far each wheel moves for a load, and what its camber and toe do on the way (about four in ten of the game's suspensions so far).
+[*]The bolts that hold a borrowed set are spread over the body nodes around it. One light node carrying seven of them broke at spawn.
+[*]A bonnet's or door's pop-open spring no longer breaks on its own as the car settles.
+[*]Beams of a borrowed engine or suspension that ran between two points of its own car's frame are left out; each point is bolted to your body on its own.
+[*]A driven axle whose suspension has no differential (the rear of a front-drive car behind a rear-drive gearbox) is given one, with a half-shaft to each wheel. The Engine tab's Drive shafts card shows the whole line from the engine to the wheels and marks what was added.
+[*]Suspension nodes that another part of their own car touched with a bump stop, a sway bar or a half-shaft are no longer bolted to your body (that locked the Covet's rear hubs solid).
+[*]Brake calipers ride on the knuckle on suspensions where the first group the game names for it is too small to hang a mesh on.
+[*]A slot of the game's that names a part no file defines (the Rock Bouncer's rear air bump stop) is left empty, as the game leaves it.
+[*]A fitted suspension is placed by where its jbeam puts the wheels, on the axle line and centred between your wheels (it was placed by the size of its meshes).
+[*]A fitted engine is placed by its block, where your car's own engine model is, and a gearbox straight behind it.
+[*]Your own wheels, tyres and brakes turn with the game's wheel on most suspensions.
+[*]A gearbox from the game keeps only the driveline that leads to your axles; a centre differential left with one output is locked. A gearbox that brings its own transfer case (the pickup's and the van's four-wheel drive) keeps it, so those drive.
+[*]A bonnet, boot lid or door catch is tied to the body so it is held every way. A bonnet catch sat up to 65 mm out of place before and never latched.
+[*]The mounting points of a fitted suspension, engine or gearbox are bolted to your body the same way; strut-tower points sat 30 to 46 mm out before.
+[*]A drive shaft or differential that pushed against its own car's engine block now pushes against the engine you fitted.
+[*]An engine mount that slid along a rail of its own car's subframe (the Covet's middle mount) is now a plain mount when that rail didn't come along.
+[*]With nitrous fitted, an engine whose fuel tanks have their own names (the Bolide's two side tanks) had no fuel and never started.
+[*]Regenerating one side of a pair mirrors the side left standing; left and right parts that are mirror images get mirrored structure.
+[*]A node of a generated part that its beams didn't hold in some direction gets braces that do.
+[*]A gearbox is placed on the fitted engine's block, by the points the two share. A gearbox's mount that is part of the engine block is no longer bolted to the body as well.
+[*]An engine whose radiator or front end would stand ahead of your car's nose is moved back until it fits (up to a third of a metre).
+[*]A borrowed suspension's mounting points are read from its car as the game ships it, not from a stretched or long-bed frame (the Grand Marshal's limousine put a suspension 2.5 m behind the car).
+[*]Parts of the game's that fit several slots (one intake for three Sunburst engines, 117 parts in all) now fit their slots in your mod.
+[*]A slot of the game's whose default part is made for another slot gets the part of the right slot with the nearest name.
+[*]Materials a borrowed part's glow map or material swap names (a gear indicator's lit face, the Scintilla's brake discs) are brought into the mod.
+[*]A prop of a borrowed set that hangs wholly on its own car's cabin (a transaxle's clutch pedal) is left out.
+[*]A borrowed mesh bound to nodes strung along one line (the Lansdale's rear panhard rod) also takes your car's body, so the game can place it.
+[*]A node of a borrowed set that its own car held only with a damper is no longer bolted to your body.
+[*]Choosing a suspension, an engine or a gearbox while the game's parts were still being read showed an empty page; the pickers now say the parts are being read and fill in by themselves.
+[*]The bolts that hold a borrowed subframe are sized to what each node can still carry on top of its own suspension arms (lower arms broke at spawn on five of the game's front suspensions before).
+[*]Generated structure keeps out of the wheels: nodes in a wheel's room are moved out to the arch, faces through the wheel are left out. A tyre used to push every wing out of shape at spawn.
+[*]Your car's own nodes beside a fitted suspension's wheels no longer collide with the tyre.
+[*]Settings a borrowed part uses in its tables (the Hopper crawler's bypass shocks) get the game's own defaults when nothing else sets them.
+[*]Exported cars have a drive controller and fuel tank or battery of their own, so they drive with any borrowed engine.
+[*]Closing a side panel no longer makes the other panels grow. F10 in the game opens JBeam Forge reliably, and says so on screen if something is blocking it.
+[*]Changing the game folder while the game's parts were being read lost the change. Parts made with the game's own materials wrote material names the game couldn't find. Copy buttons failed when the window wasn't focused. Meshes of a car from the game bind to the nodes the game binds them to.
+[/LIST]
+[/SPOILER]
+
+[B]Known problems (as of 0.19)[/B]
+[LIST]
+[*]Bonnets and boot lids unlatch but don't lift on their own yet. Doors are fine.
+[*]Parts from very different vehicles on one car can still come apart at spawn.
+[*]Trailers are not supported beyond a tow hitch.
+[*]The Linux version has not been tried on a real Linux PC with BeamNG yet.
+[*]The five showcase cars have been checked at 2000 Hz and linted, not yet driven in the game.
+[/LIST]

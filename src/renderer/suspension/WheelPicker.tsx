@@ -32,10 +32,7 @@ export function WheelPicker({ axle }: { axle: Axle & { fitted: NonNullable<Axle[
   const [both, setBoth] = useState(true);
   const data = useSetData((s) => s.data[axle.fitted.setId]);
   const axles = useProjectStore((s) => s.doc?.axles ?? EMPTY_ARR);
-  const otherData = useSetData((s) => {
-    const other = axles.find((a) => a.id !== axle.id && a.fitted);
-    return other?.fitted ? s.data[other.fitted.setId] : undefined;
-  });
+  const setData = useSetData((s) => s.data);
   useEffect(() => {
     let live = true;
     void loadWheels().then((got) => {
@@ -56,11 +53,14 @@ export function WheelPicker({ axle }: { axle: Axle & { fitted: NonNullable<Axle[
   const q = search.trim().toLowerCase();
   const shown = fitting.filter((w) => (!brand || w.brand === brand) && (!diameter || w.diameter === diameter) && (!q || `${gameWheelLabel(w)} ${w.part}`.toLowerCase().includes(q)));
   const current = axle.fitted.choices?.[slot?.slotType ?? '']?.default ?? slot?.default ?? '';
-  // The other axle's set, when its hubs take the same lug count: the matching wheel of that end goes on it too.
-  const other = axles.find((a) => a.id !== axle.id && a.fitted);
-  const otherSlot = otherData ? setWheelSlot(otherData.parts) : null;
-  const sameLugs = !!otherSlot && !!slot && otherSlot.slotType !== slot.slotType && otherSlot.slotType.replace(/^wheel_[FR]_/, '') === slot.slotType.replace(/^wheel_[FR]_/, '');
-  const counterpart = (w: GameWheel) => (all ?? []).find((o) => o.slotType === otherSlot?.slotType && o.part === w.part.replace(/_([FR])$/, (_, e: string) => `_${e === 'F' ? 'R' : 'F'}`));
+  // The other axles' sets, where their hubs take the same lug count: the same wheel (same end) or the matching wheel of the other end goes on them too.
+  const lugs = (st: string) => st.replace(/^wheel_[FR]_/, '');
+  const others = axles
+    .filter((a) => a.id !== axle.id && a.fitted)
+    .map((a) => ({ axle: a, slot: setWheelSlot(setData[a.fitted!.setId]?.parts ?? {}) }))
+    .filter((o): o is { axle: Axle; slot: NonNullable<typeof o.slot> } => !!o.slot && !!slot && lugs(o.slot.slotType) === lugs(slot.slotType));
+  const sameLugs = others.length > 0;
+  const counterpart = (w: GameWheel, slotType: string) => (slotType === w.slotType ? w : (all ?? []).find((o) => o.slotType === slotType && o.part === w.part.replace(/_([FR])$/, (_, e: string) => `_${e === 'F' ? 'R' : 'F'}`)));
 
   const fit = (w: GameWheel | null) => {
     const choose = (a: Axle, slotType: string, stock: string, part: string | null) => {
@@ -77,10 +77,11 @@ export function WheelPicker({ axle }: { axle: Axle & { fitted: NonNullable<Axle[
     };
     if (!slot) return;
     choose(axle, slot.slotType, slot.default, w?.part ?? null);
-    if (both && sameLugs && other && otherSlot) {
-      const match = w ? counterpart(w) : null;
-      if (!w || match) choose(other, otherSlot.slotType, otherSlot.default, match?.part ?? null);
-    }
+    if (both)
+      for (const o of others) {
+        const match = w ? counterpart(w, o.slot.slotType) : null;
+        if (!w || match) choose(o.axle, o.slot.slotType, o.slot.default, match?.part ?? null);
+      }
   };
 
   return (
@@ -114,7 +115,7 @@ export function WheelPicker({ axle }: { axle: Axle & { fitted: NonNullable<Axle[
               ))}
             </div>
             <Select value={brand ?? ANY} onChange={(b: string) => setBrand(b === ANY ? null : b)} options={[{ value: ANY, label: `Any brand (${fitting.length})` }, ...brands.map((b) => ({ value: b, label: `${b} (${fitting.filter((w) => w.brand === b).length})` }))]} aria-label="Wheel brand" data-testid="wheel-brand" />
-            {sameLugs && <Toggle checked={both} onChange={setBoth} label={`Matching wheels on the ${other?.name.toLowerCase()} too`} />}
+            {sameLugs && <Toggle checked={both} onChange={setBoth} label={`Matching wheels on the ${others.map((o) => o.axle.name.toLowerCase()).join(', ')} too`} />}
           </div>
         )}
         {slot && (
