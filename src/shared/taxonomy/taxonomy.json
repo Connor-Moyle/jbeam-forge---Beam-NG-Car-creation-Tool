@@ -703,7 +703,11 @@
         "sump guard",
         "bash plate",
         "underbody protection",
-        "protection"
+        "protection",
+        "undertray",
+        "under tray",
+        "belly pan",
+        "bellypan"
       ]
     },
     {
@@ -802,7 +806,12 @@
         "lowbeam",
         "highbeam",
         "lowhighbeam",
-        "headlightglass"
+        "headlightglass",
+        "headlight glass",
+        "headlamp glass",
+        "drl",
+        "daytime running",
+        "running light"
       ]
     },
     {
@@ -869,7 +878,9 @@
         "side marker",
         "sidemarker",
         "signalglass",
-        "mirrorsignal"
+        "mirrorsignal",
+        "repeater",
+        "side repeater"
       ]
     },
     {
@@ -905,7 +916,13 @@
       "openable": false,
       "nameHints": [
         "chmsl",
-        "third brake light"
+        "third brake light",
+        "center brake light",
+        "high mount stop",
+        "high mounted stop",
+        "high stop",
+        "stop light",
+        "stop lamp"
       ]
     },
     {
@@ -1158,7 +1175,12 @@
       "openable": false,
       "nameHints": [
         "handle",
-        "door pull"
+        "door pull",
+        "interior handle",
+        "inner handle",
+        "inside handle",
+        "outer handle",
+        "outside handle"
       ]
     },
     {
@@ -1373,7 +1395,12 @@
       "openable": false,
       "nameHints": [
         "dash",
-        "instrument panel"
+        "instrument panel",
+        "glovebox",
+        "glove box",
+        "air vent",
+        "vent",
+        "vents"
       ]
     },
     {
@@ -1393,6 +1420,9 @@
         "gauge",
         "cluster",
         "instrument cluster",
+        "instrument gauges",
+        "instruments",
+        "odometer",
         "speedo",
         "tacho",
         "needle",
@@ -1441,7 +1471,9 @@
         "nav",
         "infotainment",
         "touchscreen",
-        "touch screen"
+        "touch screen",
+        "speaker",
+        "speakers"
       ]
     },
     {
@@ -1499,6 +1531,10 @@
         "gear stick",
         "gearstick",
         "gear lever",
+        "gear knob",
+        "gearknob",
+        "shift knob",
+        "gear shift",
         "knob",
         "paddles",
         "shift boot"
@@ -1686,7 +1722,9 @@
       "openable": false,
       "nameHints": [
         "rearview mirror",
-        "rear view mirror"
+        "rear view mirror",
+        "view mirror",
+        "rearview"
       ]
     },
     {
@@ -1792,7 +1830,17 @@
         "v6",
         "v8",
         "pulley",
-        "belt"
+        "belt",
+        "alternator",
+        "oil pan",
+        "sump",
+        "oil sump",
+        "valve cover",
+        "cam cover",
+        "rocker cover",
+        "timing cover",
+        "starter",
+        "water pump"
       ]
     },
     {
@@ -1931,6 +1979,9 @@
         "tail pipe",
         "silencer",
         "catalytic",
+        "catalyst",
+        "cat",
+        "cat back",
         "resonator"
       ]
     },

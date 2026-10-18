@@ -110,6 +110,15 @@ describe('Classifier', () => {
     expect(kind('Petrol_Flap')).toBe('fuel_door');
     expect(kind('Accelerator')).toBe('pedals');
     expect(classifier.classify('Pedal_Brake').confidence).toBeGreaterThanOrEqual(0.9);
+    expect(kind('High_Mount_Stop')).toBe('brake_light'); // not an engine mount
+    expect(kind('DRL_L')).toBe('headlight');
+    expect(kind('Glovebox')).toBe('dashboard');
+    expect(kind('Gear_Knob')).toBe('shifter');
+    expect(kind('Rear_View_Mirror')).toBe('interior_mirror');
+    expect(kind('Sump')).toBe('engine');
+    expect(kind('Undertray')).toBe('skidplate');
+    expect(kind('Side_Repeater_L')).toBe('indicator');
+    expect(classifier.classify('Instrument_Cluster').confidence).toBe(1);
   });
 
   it('leaves names it cannot explain unassigned', () => {
