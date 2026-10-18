@@ -4,6 +4,8 @@ import { projectStore } from '@renderer/app/stores/project';
 import { useUiStore } from '@renderer/app/stores/ui';
 import { call } from '@renderer/diagnostics/ipc';
 import { create } from 'zustand';
+import { lightFunction } from '@shared/export/lights';
+import { slotsOf } from './seed';
 
 /** Undoable material edits. Each call is one history entry. */
 
@@ -121,6 +123,39 @@ export function assignMaterial(id: string, meshKeys: readonly string[]): void {
       }
     },
   });
+}
+
+/**
+ * A light whose material is on other parts too can't glow (the export would light the body up).
+ * Each such material gets a copy, "<name>_light", on the light meshes only. Returns how many copies were made.
+ */
+export function splitLightMaterials(): number {
+  const doc = projectStore.getState().doc;
+  if (!doc) return 0;
+  const isLight = (key: string) => {
+    const p = doc.parts.find((x) => x.id === doc.assignments[key]);
+    return !!p && lightFunction(p.taxonomyId, p.position) !== null;
+  };
+  const keys = Object.keys(doc.assignments).filter((k) => !doc.ignoredMeshes.includes(k));
+  const lightKeys = keys.filter(isLight);
+  const onOthers = new Set(keys.filter((k) => !isLight(k)).flatMap((k) => slotsOf(doc, k) ?? []));
+  const copies = new Map<string, MaterialDef>();
+  for (const id of new Set(lightKeys.flatMap((k) => slotsOf(doc, k) ?? []))) {
+    const src = onOthers.has(id) ? doc.materials.find((m) => m.id === id) : undefined;
+    if (src) copies.set(id, { ...structuredClone(src), id: `mat_${crypto.randomUUID().slice(0, 8)}`, name: uniqueName(`${src.name}_light`), origin: null });
+  }
+  if (!copies.size) return 0;
+  projectStore.getState().execute({
+    label: `Own material${copies.size === 1 ? '' : 's'} for the lights`,
+    apply: (d) => {
+      d.materials.push(...copies.values());
+      for (const k of lightKeys) {
+        const slots = slotsOf(d, k);
+        if (slots?.some((id) => copies.has(id))) d.materialSlots[k] = slots.map((id) => copies.get(id)?.id ?? id);
+      }
+    },
+  });
+  return copies.size;
 }
 
 /** Delete a material; meshes using it go to `replacement` (or are left without, keeping their imported look). */

@@ -4253,6 +4253,14 @@ const scenarios = [
       await page.getByTestId('toolbar-export').click();
       await page.getByTestId('export-dialog').waitFor();
       await shot(page, 'practice-export-dialog');
+      // The practice car's lights share the model's one material: the warning's button gives them their own, and the warning goes.
+      const splitLights = page.getByTestId('export-split-lights');
+      await splitLights.waitFor({ timeout: 10_000 });
+      const sharedBefore = (await page.getByTestId('export-dialog').textContent()).match(/won't glow/g)?.length ?? 0;
+      await splitLights.click();
+      for (let i = 0; i < 100 && (((await page.getByTestId('export-dialog').textContent()) ?? '').includes("won't glow") || (await page.getByTestId('export-install').isDisabled())); i++) await page.waitForTimeout(100);
+      const lightMats = (await hook(page, 'projectDoc')).materials.filter((m) => /_light$/.test(m.name)).length;
+      assert(sharedBefore > 0 && lightMats > 0 && !((await page.getByTestId('export-dialog').textContent()) ?? '').includes("won't glow"), `the lights got their own material (${sharedBefore} shared before, ${lightMats} light materials now)`);
       await page.getByTestId('export-install').click();
       await page.getByTestId('export-result').waitFor({ timeout: 60_000 });
       const unpacked = join(fakeUserDir, 'mods', 'unpacked');
