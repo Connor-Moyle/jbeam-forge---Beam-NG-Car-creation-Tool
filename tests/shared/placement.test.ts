@@ -48,4 +48,10 @@ describe('placement', () => {
     const { project } = parseProject(readFileSync(join(FIXTURES, 'v7-hinges.jbforge'), 'utf8'));
     for (const s of project.sources) expect(s.placement).toEqual(IDENTITY_PLACEMENT);
   });
+
+  it('stretches sideways about the centre line before moving (a fitted suspension at a wider track)', () => {
+    const [x, y, z] = transform(placementMatrix({ position: [0.1, 2, 0], rotation: [0, 0, 0], scale: 1, lateral: 1.1 }), [0.7, 0, 0.3]);
+    expect([x, y, z]).toEqual([expect.closeTo(0.87), 2, 0.3]);
+    expect(samePlacement({ position: [0, 0, 0], rotation: [0, 0, 0], scale: 1 }, { position: [0, 0, 0], rotation: [0, 0, 0], scale: 1, lateral: 1.1 })).toBe(false);
+  });
 });

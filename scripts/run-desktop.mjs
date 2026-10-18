@@ -1983,7 +1983,7 @@ const scenarios = [
         await page.waitForSelector('[data-view=editor][data-testid=app-ready]');
       }
       const narrow = [];
-      for (const preset of ['modelling', 'model', 'materials', 'jbeam', 'suspension', 'moving', 'triggers', 'scripts', 'testing', 'engine', 'tyres', 'wheels', 'panel']) {
+      for (const preset of ['modelling', 'model', 'materials', 'jbeam', 'suspension', 'moving', 'triggers', 'scripts', 'testing', 'engine', 'sound', 'tyres', 'wheels', 'panel']) {
         await hook(page, 'applyPreset', preset);
         await page.waitForTimeout(150);
         const groups = await page.evaluate(() => [...document.querySelectorAll('.dv-groupview')].map((g) => ({ w: Math.round(g.getBoundingClientRect().width), h: Math.round(g.getBoundingClientRect().height), tabs: [...g.querySelectorAll('.dv-tab')].map((x) => x.textContent.trim()).join('+') })));

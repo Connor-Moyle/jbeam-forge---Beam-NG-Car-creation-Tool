@@ -119,7 +119,7 @@ After that you land on the home screen: **New Mod**, **Open Existing**, **Learn*
 If you've used Blender you'll feel at home. The window keeps the same shape whatever you're doing: the 3D view in the middle, the thing you pick from on the left, the thing you change on the right.
 
 - **Toolbar.** File buttons on the left, then **Generate** and **Test**. On the right, **Configurations** and **Export**, then downloads, help and settings. The steps of a mod have their names written on them; the rest are icons with a tooltip.
-- **Workspace tabs.** Under the toolbar, in the order a car comes together: Parts, Modelling, Materials, JBeam, Suspension, Engine, Moving parts, Triggers, Scripts, Testing. Each one lays the panels out for that job. Ctrl+1 to Ctrl+0 jump between them.
+- **Workspace tabs.** Under the toolbar, in the order a car comes together: Parts, Modelling, Materials, JBeam, Suspension, Engine, Sound, Moving parts, Triggers, Scripts, Testing. Each one lays the panels out for that job. Ctrl+1 to Ctrl+0 jump between them.
 - **The 3D view.** The strip along its top is everything about what it draws: **Edit nodes** on the left, then show/hide for the mesh and the nodes and beams, X-ray, and which material channel you're looking at.
 - **Scene.** The tree on the left: every mesh and the part it belongs to.
 - **Properties.** The column on the right, with a strip of icons down its side. Top to bottom: the Inspector (whatever you've picked), materials, paints and the Skin studio, suspension and the engine, configurations and extras, then the objects library and the reference car. Click an icon to switch; click it again to go back to the Inspector.
@@ -369,7 +369,7 @@ You can mix both approaches. A per-corner checklist shows what's from your mesh 
 The sandbox doesn't simulate the powertrain, so the dyno chart is your preview there.
 
 ### Sound
-The **Sound** tab is the car's mixing desk. Everything it sets is written into the mod's own files: the game's sounds are read, never changed.
+The **Sound** workspace (the tab after Engine) is the car's mixing desk. Everything it sets is written into the mod's own files: the game's sounds are read, never changed.
 
 - **Engine voice.** Which recordings the intake and the exhaust play: any of the game's engine sounds, or one of your own (below). Play it and sweep the revs to hear it in the app.
 - **My engine sounds.** A sound of the mod's own: a **pitched copy** of a game sound (above 1 it sounds bigger and lazier, below 1 smaller and revvier), or a sound made **from your recordings** (ogg, wav or flac, each a steady note at the revs in its file name, on or off throttle). Pitched copies need a game sound with recordings; the newer synthesized ones can only be mixed.

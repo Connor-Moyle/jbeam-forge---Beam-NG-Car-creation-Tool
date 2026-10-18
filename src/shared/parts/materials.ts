@@ -25,7 +25,7 @@ export function nicePrice(p: number): number {
 /** Material-adjusted defaults for a part of this kind. Glass, tyres and mechanicals keep their own preset. */
 export function materialDefaults(entry: TaxonomyEntry, material: ConstructionMaterial): { mass: number; price: number; beamPreset: BeamPreset } {
   const m = CONSTRUCTION[material];
-  const panel = entry.beamPreset === 'panel_metal' || entry.beamPreset === 'panel_plastic';
+  const panel = entry.beamPreset === 'panel_metal' || entry.beamPreset === 'panel_plastic' || entry.beamPreset === 'panel_bumper';
   return {
     mass: Math.round(entry.defaultMass * m.massMultiplier * 100) / 100,
     price: nicePrice(entry.defaultPrice * m.priceMultiplier),

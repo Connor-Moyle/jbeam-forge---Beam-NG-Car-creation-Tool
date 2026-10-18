@@ -158,7 +158,7 @@ function standingProxy(doc: Pick<Doc, 'nodes' | 'tris'>, partId: string): ProxyM
 }
 
 /** Panels and trim that are held flat by stiffener nodes when they come out thin (glass and mechanical parts aren't). */
-const STIFFENED: ReadonlySet<string> = new Set(['panel_metal', 'panel_plastic', 'trim_light', 'structure_stiff']);
+const STIFFENED: ReadonlySet<string> = new Set(['panel_metal', 'panel_plastic', 'panel_bumper', 'trim_light', 'structure_stiff']);
 
 /**
  * The middle of the car, low down: a panel's inner side is the one facing it. From the body's

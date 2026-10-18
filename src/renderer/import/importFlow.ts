@@ -1,6 +1,6 @@
 import { useEffect } from 'react';
-import { IDENTITY_PLACEMENT } from '@shared/project/schema';
-import { samePlacement } from '@shared/placement';
+import { IDENTITY_PLACEMENT, type Placement } from '@shared/project/schema';
+import { samePlacement, type ShownPlacement } from '@shared/placement';
 import { applyPlacement } from './placement';
 import { applyMeshEdits, editsKey } from './meshEdits';
 import { applyMeshModels } from '@renderer/modelling/build';
@@ -28,6 +28,13 @@ import type { ImportedMesh } from './normalize';
 import { EMPTY_ARR } from '@shared/empty';
 import { offerAutoClassify } from '@renderer/parts/commands';
 import { acOption } from './kn5';
+
+/** A source as the viewport shows it: a fitted suspension stretched to its axle's track, as the export does. */
+function shownPlacement(sourceId: string, placement: Placement): ShownPlacement {
+  const axle = projectStore.getState().doc?.axles.find((a) => a.fitted?.sourceId === sourceId);
+  const lateral = axle?.fitted?.track ? axle.track / axle.fitted.track : 1;
+  return lateral === 1 ? placement : { ...placement, lateral };
+}
 
 const logger = rlog('import');
 
@@ -254,8 +261,9 @@ async function loadFromDisk(source: Source, quiet = false): Promise<void> {
     }
     if (source.format === 'fbx') adoptLegacyFbxKeys(source.id, done.meshes);
     registerImportedTextures(done.meshes);
-    applyPlacement(done.meshes, IDENTITY_PLACEMENT, source.placement);
-    store({ ...base, status: 'ready', placement: source.placement, raw: done.meshes, ...deriveMeshes(source.id, done.meshes), textures: done.textures, error: null, stats: { triangles: staged.triangles, totalMs: done.totalMs } });
+    const shown = shownPlacement(source.id, source.placement);
+    applyPlacement(done.meshes, IDENTITY_PLACEMENT, shown);
+    store({ ...base, status: 'ready', placement: shown, raw: done.meshes, ...deriveMeshes(source.id, done.meshes), textures: done.textures, error: null, stats: { triangles: staged.triangles, totalMs: done.totalMs } });
     seedMaterials(source.id, done.meshes); // projects from before materials existed
     if (source.format === 'kn5' && acOption('acIgnoreHelpers')) useSceneStore.getState().setHidden(acHelperKeys(done.meshes), true);
   } catch (err) {
@@ -349,16 +357,18 @@ export function useSourceSync(): void {
     }
   }, [sources]);
 
-  // Placement changed (moved in the Placement dialog, undo/redo): move the loaded geometry, no reload.
+  // Placement changed (moved in the Placement dialog, undo/redo, an axle's track): move the loaded geometry, no reload.
+  const axles = useProjectStore((s) => s.doc?.axles ?? EMPTY_ARR);
   useEffect(() => {
     const scene = useSceneStore.getState();
     for (const s of sources) {
       const loaded = scene.sources[s.id];
-      if (loaded?.status !== 'ready' || !loaded.placement || samePlacement(loaded.placement, s.placement)) continue;
-      applyPlacement(loaded.raw, loaded.placement, s.placement);
-      scene.setSource({ ...loaded, placement: s.placement, ...deriveMeshes(s.id, loaded.raw) });
+      const shown = shownPlacement(s.id, s.placement);
+      if (loaded?.status !== 'ready' || !loaded.placement || samePlacement(loaded.placement, shown)) continue;
+      applyPlacement(loaded.raw, loaded.placement, shown);
+      scene.setSource({ ...loaded, placement: shown, ...deriveMeshes(s.id, loaded.raw) });
     }
-  }, [sources]);
+  }, [sources, axles]);
 
   // Splits changed (split, unsplit, undo/redo): re-derive the affected sources from their raw meshes.
   // Per-mesh edits and copies too: the same re-derive.

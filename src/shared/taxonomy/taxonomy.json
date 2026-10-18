@@ -499,7 +499,7 @@
       "defaultMass": 15,
       "defaultPrice": 450,
       "nodePrefix": "bp",
-      "beamPreset": "panel_plastic",
+      "beamPreset": "panel_bumper",
       "openable": false,
       "nameHints": [
         "bumper cover",

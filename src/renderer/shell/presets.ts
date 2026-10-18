@@ -16,6 +16,7 @@ export const PRESET_LABELS: Record<PresetId, string> = {
   jbeam: 'JBeam',
   suspension: 'Suspension',
   engine: 'Engine',
+  sound: 'Sound',
   moving: 'Moving parts',
   triggers: 'Triggers',
   scripts: 'Scripts',
@@ -94,6 +95,8 @@ export const PRESETS: Record<PresetId, readonly PresetPlacement[]> = {
   suspension: [{ id: 'viewport' }, SCENE, properties('suspension')],
   // The engine (and engine mods): the car big in the middle, the engine designer on the right.
   engine: [{ id: 'viewport' }, properties('powertrain')],
+  // The car's sounds: the engine's voice and mix, gear whine, horn, latches, cabin.
+  sound: [{ id: 'viewport' }, properties('sound')],
   // Doors, needles, wipers: what moves on the left, its settings on the right.
   moving: [
     { id: 'viewport' },
@@ -186,7 +189,7 @@ export const PRESETS: Record<PresetId, readonly PresetPlacement[]> = {
 export function workspacesFor(kind: 'vehicle' | 'engine' | 'tyres' | 'wheels' | 'panel' | undefined): readonly PresetId[] {
   switch (kind) {
     case 'engine':
-      return ['engine'];
+      return ['engine', 'sound'];
     case 'tyres':
       return ['tyres', 'materials'];
     case 'wheels':
@@ -194,7 +197,7 @@ export function workspacesFor(kind: 'vehicle' | 'engine' | 'tyres' | 'wheels' | 
     case 'panel':
       return ['panel', 'materials'];
     default:
-      return ['modelling', 'model', 'materials', 'jbeam', 'suspension', 'engine', 'moving', 'triggers', 'scripts', 'testing'];
+      return ['modelling', 'model', 'materials', 'jbeam', 'suspension', 'engine', 'sound', 'moving', 'triggers', 'scripts', 'testing'];
   }
 }
 

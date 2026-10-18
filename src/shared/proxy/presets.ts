@@ -33,6 +33,8 @@ export const BEAM_PRESET_VALUES: Record<BeamPresetId, BeamPreset> = {
   // lighter than the game's (a thin skirt's weigh 0.15 kg, a steering wheel's 0.5 kg), and at the
   // game's 400k–1.5M those parts blew up at spawn in the 2000 Hz check. Deform and strength are the game's.
   panel_plastic: { label: 'Plastic panel', beamSpring: 200_000, beamDamp: 60, beamDeform: 8_000, beamStrength: 55_000, nodeWeight: 0.6, nodeMaterial: '|NM_PLASTIC', braceSpringFactor: 0.5 },
+  // Bumpers are nearly as stiff as doors in the game (800k) on nodes of about 1 kg; a little under that here.
+  panel_bumper: { label: 'Bumper', beamSpring: 600_000, beamDamp: 80, beamDeform: 15_000, beamStrength: 59_000, nodeWeight: 1.1, nodeMaterial: '|NM_PLASTIC', braceSpringFactor: 0.5 },
   trim_light: { label: 'Light trim', beamSpring: 600_000, beamDamp: 50, beamDeform: 8_000, beamStrength: 55_000, nodeWeight: 0.6, nodeMaterial: '|NM_PLASTIC', braceSpringFactor: 0.5 },
   glass_brittle: { label: 'Glass', beamSpring: 250_000, beamDamp: 50, beamDeform: 4_000, beamStrength: 6_000, nodeWeight: 1.2, nodeMaterial: '|NM_GLASS', braceSpringFactor: 0.5 },
   mechanical: { label: 'Mechanical', beamSpring: 5_000_000, beamDamp: 140, beamDeform: 60_000, beamStrength: 350_000, nodeWeight: 4.5, nodeMaterial: '|NM_METAL', braceSpringFactor: 0.7 },
@@ -91,7 +93,7 @@ const PANEL_BUDGETS: Record<string, [number, number]> = { door: [10, 20], hood: 
 
 /** Proxy mode, budget, bracing and attachment defaults for a part kind (user-overridable per part). */
 export function kindDefaults(entry: TaxonomyEntry): KindDefaults {
-  const attachment: AttachmentStyle = entry.beamPreset === 'glass_brittle' ? 'clipped' : entry.subcategory === 'Structure' || entry.category === 'Mechanical' ? 'bolted' : entry.beamPreset === 'panel_plastic' || entry.beamPreset === 'trim_light' ? 'clipped' : 'bolted';
+  const attachment: AttachmentStyle = entry.beamPreset === 'glass_brittle' ? 'clipped' : entry.subcategory === 'Structure' || entry.category === 'Mechanical' ? 'bolted' : entry.beamPreset === 'panel_plastic' || entry.beamPreset === 'panel_bumper' || entry.beamPreset === 'trim_light' ? 'clipped' : 'bolted';
   const base = { bracing: 'standard' as BracingDensity, attachment, role: 'own' as StructureRole };
   if (entry.beamPreset === 'tyre_rubber' || SUSPENSION_SUBCATEGORIES.has(entry.subcategory) || SUSPENSION_IDS.has(entry.id) || GAME_SET_IDS.has(entry.id)) return { ...base, role: 'suspension', mode: 'cylinder', budget: [4, 8] };
   if (RIDERS.has(entry.id)) return { ...base, role: 'rides', mode: 'decimate', budget: [4, 8], bracing: 'none' };
@@ -107,7 +109,7 @@ export function kindDefaults(entry: TaxonomyEntry): KindDefaults {
   if (entry.subcategory === 'Rollcage') return { ...base, mode: 'surface', budget: [24, 60] };
   if (entry.beamPreset === 'trim_light') return { ...base, mode: 'hull', budget: [5, 11], bracing: 'light' };
   if (PANEL_BUDGETS[entry.id]) return { ...base, mode: 'hull', budget: PANEL_BUDGETS[entry.id]! };
-  if (entry.beamPreset === 'panel_metal' || entry.beamPreset === 'panel_plastic') return { ...base, mode: 'hull', budget: [8, 20] };
+  if (entry.beamPreset === 'panel_metal' || entry.beamPreset === 'panel_plastic' || entry.beamPreset === 'panel_bumper') return { ...base, mode: 'hull', budget: [8, 20] };
   if (entry.beamPreset === 'structure_stiff') return { ...base, mode: 'hull', budget: [10, 26] };
   return { ...base, mode: 'hull', budget: [8, 16] };
 }

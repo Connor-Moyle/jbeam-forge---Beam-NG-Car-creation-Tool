@@ -25,6 +25,7 @@ const PRESET_LABELS: Record<(typeof BEAM_PRESETS)[number], string> = {
   structure_stiff: 'Stiff structure',
   panel_metal: 'Metal panel',
   panel_plastic: 'Plastic panel',
+  panel_bumper: 'Bumper',
   trim_light: 'Light trim',
   glass_brittle: 'Glass',
   mechanical: 'Mechanical',
