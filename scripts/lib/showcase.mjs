@@ -84,6 +84,7 @@ export const SHOWCASE_CARS = {
     gearbox: 'us_semi/us_semi_transmission_5A',
     engineOptions: ['us_semi/us_semi_engine_V8', 'midtruck/midtruck_engine_diesel_i6', 'pickup/pickup_engine_v8_6.0_diesel'],
     fuelL: 1200,
+    springScale: 4,
     masses: [[/^Chassis frame$/, 900], [/^Cab$/, 450], [/^Truck bed$/, 200], [/fuel tank/i, 60], [/^Roof$/, 40]],
     hinges: true,
     moving: MOVING,
@@ -466,6 +467,20 @@ export async function showcaseBuild({ page, base, plan, model, hook, shot, asser
   }
   writeFileSync(join(outDir, 'showcase-configs.json'), JSON.stringify(picked, null, 1));
   for (const cfg of plan.configs) assert(picked[cfg.name].length >= 4, `${cfg.name} picks its parts (${picked[cfg.name].join('; ')})`);
+  // With everything on it the car weighs what it will weigh: a suspension from a much lighter (or heavier) car
+  // offers its springs and dampers scaled to this weight, one click per axle (the truck's four, from a 2.2 t van).
+  if (!(await page.getByTestId('suspension-panel').count())) await page.getByTestId('toggle-suspension').click();
+  await page.getByTestId('suspension-panel').waitFor();
+  const matchSprings = page.getByTestId('axle-match-springs');
+  const toMatch = await matchSprings.count();
+  for (let i = 0; i < toMatch; i++) await matchSprings.first().click();
+  if (toMatch) {
+    const d = await hook(page, 'projectDoc');
+    const scales = d.axles.map((a) => a.edits?.fields?.$springScale);
+    assert(scales.filter((k) => typeof k === 'number' && k > 0 && k !== 1).length === toMatch && (await matchSprings.count()) === 0, `springs matched to the car's weight on ${toMatch} axle(s) (${scales.join(', ')})`);
+    await shot(page, 'showcase-springs-matched');
+  }
+  if (plan.springScale !== undefined) assert(toMatch === plan.springScale, `${plan.springScale} axle(s) offered matched springs (${toMatch})`);
   // Save the project, then export and install.
   const projectPath = join(outDir, `${base}.jbforge`);
   await hook(page, 'queueDialog', [projectPath]);

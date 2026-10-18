@@ -48,6 +48,7 @@ Every finished phase ships as a Windows installer and a portable exe on GitHub R
 | Version | Contents |
 |---|---|
 | 0.6.0 | Phases 1–6 plus the grouped scene tree |
+| 0.19.3 | Springs matched to the car's weight: a borrowed suspension from a much lighter or heavier car gets its springs and dampers scaled in one click (axle edit `$springScale`, applied to the set's strut, spring and shock parts on export) |
 | 0.19.2 | Hinges on any edge of the part (Hinges on: front/rear/left/right/top/bottom); the export dialog's "Move the nodes out of the tyres" button; Hinge all hinges variant panels too; no export warning for parts the export leaves out |
 | 0.19.1 | Animated parts and scripted movement removable from the Moving parts list (× on each row); the Animation section's Stop animating is in its header |
 | 0.19.0 | Any number of axles: an axle beyond the first of its end carries its own copies of its wheels, the same suspension twice gets unique wheel and device names, axle names, Steers picks the sets offered; steering range per axle; fuel capacity (format v28); three more showcase cars (8x8 hauler, estate, camper) built through the app with every feature (`scripts/lib/showcase.mjs`) |

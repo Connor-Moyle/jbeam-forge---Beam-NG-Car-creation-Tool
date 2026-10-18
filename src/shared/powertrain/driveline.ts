@@ -1,6 +1,7 @@
 import { isJbeamObject, type JbeamObject, type JbeamValue } from '../jbeam/parse';
 import type { PowertrainEdits } from '../project/schema';
 import { fieldKey } from './edits';
+import { scaleSprings, SPRING_SCALE } from '../suspension/load';
 
 /**
  * The driveline builder: a fitted suspension's differentials (and the
@@ -133,6 +134,7 @@ export function applyDrivelineEdits(parts: Readonly<Record<string, JbeamObject>>
   if (!edits) return out;
   const entries: [string, number | string][] = [...Object.entries(edits.fields), ...Object.entries(edits.texts ?? {})];
   for (const [key, value] of entries) {
+    if (key === SPRING_SCALE) continue;
     const [part, section, name] = key.split('/');
     if (!part || !section || !name || !out[part]) continue;
     if (section === 'pressureWheels') {
@@ -163,5 +165,6 @@ export function applyDrivelineEdits(parts: Readonly<Record<string, JbeamObject>>
       out[part] = { ...out[part], [section]: { ...sec, [name]: value } };
     }
   }
-  return out;
+  const k = edits.fields[SPRING_SCALE];
+  return typeof k === 'number' ? scaleSprings(out, k) : out;
 }

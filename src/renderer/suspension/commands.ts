@@ -24,6 +24,10 @@ import type { JbeamObject } from '@shared/jbeam/parse';
 import type { Project } from '@shared/project/schema';
 import { nodesFoulingTyres, outOfTyre, type StockTyre } from '@shared/suspension/arch';
 import type { SetWheel } from '@shared/suspension/wheels';
+import { SPRING_SCALE, springScaleFor } from '@shared/suspension/load';
+import { resolveConfig } from '@shared/export/configs';
+import { configStats } from '@shared/export/configStats';
+import { currentTaxonomy } from '@renderer/parts/taxonomy';
 
 /**
  * Suspension workshop (Phase 10): the car's axles, and complete suspensions
@@ -46,6 +50,34 @@ export function tyreFouls(doc: Project): { axle: Axle; set: SuspensionSet; tyre:
     out.push({ axle, set, tyre: set.tyre, wheels, inside: nodesFoulingTyres(wheels, set.tyre, ownNodes) });
   }
   return out;
+}
+
+/** What the car weighs in its default configuration, kg (null until it has parts with weights). */
+export function carWeightKg(doc: Project): number | null {
+  const tax = currentTaxonomy();
+  const sets = useSetData.getState().data;
+  const config = doc.configs.find((c) => c.id === doc.defaultConfigId) ?? null;
+  return configStats(doc, tax, resolveConfig(doc, tax, config, sets), sets).weightKg;
+}
+
+/** The spring scale that would match an axle's suspension to this car, or null when it suits already (or the weights aren't known). */
+export function springScaleWanted(doc: Project, axle: Axle): number | null {
+  const set = axle.fitted && (useSuspensionCatalogue.getState().sets ?? []).find((s) => s.id === axle.fitted!.setId);
+  return set ? springScaleFor(carWeightKg(doc), set.vehicleWeight) : null;
+}
+
+/** Scale an axle's suspension springs and dampers (null: back to the game's numbers). */
+export function setSpringScale(axleId: string, k: number | null): void {
+  projectStore.getState().execute({
+    label: k === null ? 'Springs as the game made them' : `Springs ×${k} for this car's weight`,
+    apply: (d) => {
+      const a = d.axles.find((x) => x.id === axleId);
+      if (!a) return;
+      a.edits ??= emptyEdits();
+      if (k === null) delete a.edits.fields[SPRING_SCALE];
+      else a.edits.fields[SPRING_SCALE] = k;
+    },
+  });
 }
 
 /** Move every node that starts inside a fitted suspension's tyres out to just past the tread (undoable). Returns how many moved. */

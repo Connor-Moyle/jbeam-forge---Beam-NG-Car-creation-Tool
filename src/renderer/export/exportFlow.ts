@@ -37,7 +37,7 @@ import { installProblems } from '@shared/export/installCheck';
 import { stampGameVersion } from './gameVersion';
 import { wheelNames } from '@shared/suspension/wheels';
 import { archWarning } from '@shared/suspension/arch';
-import { suspensionLoadWarning } from '@shared/suspension/load';
+import { SPRING_SCALE, suspensionLoadWarning } from '@shared/suspension/load';
 import { jbeamMaterialRefs } from '@shared/export/materialRefs';
 import { blendExportName, blendFileText, blendSamplePath, pitchSamples, type BlendSample } from '@shared/sound/blend';
 import { blockBounds } from '@shared/powertrain/placement';
@@ -299,8 +299,9 @@ export function prepareExport(): PreparedExport | null {
     if (set?.vehicleType && /trailer/i.test(set.vehicleType) && !/trailer/i.test(doc.meta.type ?? ''))
       report.warnings.push({ code: 'TRAILER_SUSPENSION', message: `${a.fitted!.name} on the ${a.name.replace(/ axle$/i, '').toLowerCase()} axle comes from a trailer (${set.vehicleName}): it doesn't steer and is built for a trailer's loads, so the car may handle badly or come apart. Spawn it and check, or pick a car's suspension.` });
   }
-  // A suspension under a car much heavier or lighter than the one it was made for.
+  // A suspension under a car much heavier or lighter than the one it was made for (not once its springs are scaled to this car).
   for (const a of fittedAxles) {
+    if (a.edits?.fields[SPRING_SCALE] !== undefined) continue;
     const set = catalogue.find((s) => s.id === a.fitted!.setId);
     const text = set ? suspensionLoadWarning(set, a.name.replace(/ axle$/i, '').toLowerCase(), defaultWeightKg) : null;
     if (text) report.warnings.push({ code: 'SUSPENSION_LOAD', message: text });

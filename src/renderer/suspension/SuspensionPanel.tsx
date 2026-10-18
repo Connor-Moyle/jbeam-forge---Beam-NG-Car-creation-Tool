@@ -14,7 +14,8 @@ import { NumberInput } from '@renderer/ui/components/NumberInput';
 import { ScrollArea } from '@renderer/ui/components/ScrollArea';
 import { Toggle } from '@renderer/ui/components/Toggle';
 import { SetPicker, TuningView } from '@renderer/workshop/WorkshopUi';
-import { addAxle, addSuspensionOption, axleKind, fitSuspension, removeAxle, removeSuspension, removeSuspensionOption, setSuspensionChoices, setTuning, setUpAxles, updateAxle, showGameMeshes, showOwnMeshes, useSuspensionCatalogue, useSuspensionUi } from './commands';
+import { addAxle, addSuspensionOption, axleKind, fitSuspension, removeAxle, removeSuspension, removeSuspensionOption, setSpringScale, setSuspensionChoices, setTuning, setUpAxles, springScaleWanted, updateAxle, showGameMeshes, showOwnMeshes, useSuspensionCatalogue, useSuspensionUi } from './commands';
+import { SPRING_SCALE } from '@shared/suspension/load';
 import { DrivelineView } from './DrivelineView';
 import { TravelCheck } from './TravelCheck';
 import { WheelPicker } from './WheelPicker';
@@ -88,6 +89,9 @@ export function SuspensionPanel() {
 function AxleCard({ axle }: { axle: Axle }) {
   const selection = useSceneStore((s) => s.selection);
   const own = axle.ownMeshes.length;
+  const scale = axle.edits?.fields[SPRING_SCALE];
+  // The car's weight over the donor's: the scale that would make the springs carry it as they carried their own car.
+  const wanted = useProjectStore((s) => (s.doc && axle.fitted && scale === undefined ? springScaleWanted(s.doc, axle) : null));
   return (
     <section className={styles.card} data-testid="axle-card">
       <header className={styles.axleHead}>
@@ -150,6 +154,24 @@ function AxleCard({ axle }: { axle: Axle }) {
               </Button>
             )}
           </div>
+          {wanted !== null && (
+            <div className={styles.row}>
+              <p className={styles.note}>
+                Made for a car {wanted > 1 ? `${Math.round((wanted - 1) * 100)}% lighter` : `${Math.round((1 / wanted - 1) * 100)}% heavier`} than this one: it would sit {wanted > 1 ? 'low, on its bump stops' : 'high and ride hard'}.
+              </p>
+              <Button size="sm" onClick={() => setSpringScale(axle.id, wanted)} data-testid="axle-match-springs">
+                Springs ×{wanted} for this car
+              </Button>
+            </div>
+          )}
+          {scale !== undefined && (
+            <div className={styles.row}>
+              <p className={styles.note}>Springs and dampers ×{scale} for this car&rsquo;s weight: it sits as the game&rsquo;s car did.</p>
+              <Button size="sm" variant="ghost" onClick={() => setSpringScale(axle.id, null)}>
+                As the game made them
+              </Button>
+            </div>
+          )}
           <TravelCheck axle={{ ...axle, fitted: axle.fitted }} />
           {!own && <p className={styles.note}>Made your own suspension? Select its meshes and use them: this set&rsquo;s jbeam does the physics, your meshes are what you see.</p>}
           <div className={styles.card} data-testid="axle-options">
