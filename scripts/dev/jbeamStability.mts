@@ -9,6 +9,7 @@ import { readdirSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { isJbeamObject, parseJbeam, type JbeamObject } from '../../src/shared/jbeam/parse';
 import { readTable } from '../../src/shared/jbeam/tables';
+import { coordinate, variableDefaults } from '../../src/shared/suspension/transplant';
 
 const dir = process.argv[2]!;
 const DT = 1 / 2000;
@@ -24,12 +25,15 @@ for (const f of readdirSync(dir).filter((f) => f.endsWith('.jbeam'))) {
 const pc = JSON.parse(readFileSync(join(dir, process.argv[3] ?? 'default.pc'), 'utf8'));
 const chosen = new Set<string>(Object.values(pc.parts as Record<string, string>).filter(Boolean));
 for (const k of Object.keys(parts)) if (parts[k]!.slotType === 'main') chosen.add(k);
+// Formula positions ("$=(-1.134-$caster_F) + 0.02", the Autobello's hubs) read with the parts' variable defaults, as the game does.
+const vars = variableDefaults([...chosen].flatMap((n) => (parts[n] ? [parts[n]!] : [])));
+const num = (v: unknown) => (typeof v === 'number' ? v : coordinate(v as string, vars));
 for (const name of chosen) {
   const p = parts[name];
   if (!p) continue;
   if (p.nodes) for (const r of readTable(p.nodes).records) {
     const id = String(r.values.id);
-    nodes.set(id, { id, pos: [Number(r.values.posX), Number(r.values.posY), Number(r.values.posZ)], weight: Number(r.options.nodeWeight ?? 25), part: name });
+    nodes.set(id, { id, pos: [num(r.values.posX), num(r.values.posY), num(r.values.posZ)], weight: Number(r.options.nodeWeight ?? 25), part: name });
   }
   if (p.beams) for (const r of readTable(p.beams).records) {
     beams.push({ a: String(r.values['id1:']), b: String(r.values['id2:']), spring: Number(r.options.beamSpring ?? 4_300_000), damp: Number(r.options.beamDamp ?? 580), part: name, type: String(r.options.beamType ?? '|NORMAL') });
@@ -152,7 +156,7 @@ console.log(problems.length ? `${problems.length} problems:\n  ` + problems.slic
       const other = seen.get(id);
       if (other && other !== name) issues.push(`node ${id} is defined by both ${other} and ${name}`);
       seen.set(id, name);
-      for (const k of ['posX', 'posY', 'posZ']) if (!Number.isFinite(Number(r.values[k]))) issues.push(`node ${id} ${k} is ${String(r.values[k])}`);
+      for (const k of ['posX', 'posY', 'posZ']) if (!Number.isFinite(num(r.values[k]))) issues.push(`node ${id} ${k} is ${String(r.values[k])}`);
     }
   }
   let tris = 0;

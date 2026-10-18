@@ -22,7 +22,7 @@ import { EngineDesignSchema } from '../powertrain/design';
  * may tighten the type without a migration; anything else needs one.
  */
 export const PROJECT_FORMAT = 'jbforge';
-export const CURRENT_PROJECT_VERSION = 26;
+export const CURRENT_PROJECT_VERSION = 27;
 
 export const SLUG_PATTERN = /^[a-z0-9]+(?:_[a-z0-9]+)*$/;
 
@@ -373,6 +373,22 @@ export const SetChoicesSchema = z.record(z.string(), z.object({ default: z.strin
  * An axle (v11, Phase 10): where it is, how wide, whether it steers, and the
  * suspension fitted to it (a complete set from the game, as its own model).
  */
+/** A complete suspension from the game on an axle: its own model, its jbeam brought over on export. */
+export const FittedSuspensionSchema = z.object({
+  /** Catalogue id (vehicle/part). */
+  setId: z.string(),
+  name: z.string(),
+  vehicle: z.string(),
+  type: z.string(),
+  sourceId: z.string(),
+  /** Wheel centre to wheel centre of the set as the game built it, metres. The axle's track against this stretches the set sideways on export. */
+  track: z.number().positive().optional(),
+  /** The game's other parts for its slots (fork): default per slot and which ship as choices. */
+  choices: SetChoicesSchema.optional(),
+  /** An alternate's tag in exported part names (v27): F2, R3…, kept when alternates are reordered so configurations stay valid. */
+  tag: z.string().regex(/^[FR]\d*$/).optional(),
+});
+
 export const AxleSchema = z.object({
   id: z.string().min(1),
   name: z.string(),
@@ -387,20 +403,9 @@ export const AxleSchema = z.object({
   ownMeshes: z.array(z.string()),
   /** The driveline builder's changes to the set's differentials (fork): same form as the engine's edits. */
   edits: PowertrainEditsSchema.optional(),
-  fitted: z
-    .object({
-      /** Catalogue id (vehicle/part). */
-      setId: z.string(),
-      name: z.string(),
-      vehicle: z.string(),
-      type: z.string(),
-      sourceId: z.string(),
-      /** Wheel centre to wheel centre of the set as the game built it, metres. The axle's track against this stretches the set sideways on export. */
-      track: z.number().positive().optional(),
-      /** The game's other parts for its slots (fork): default per slot and which ship as choices. */
-      choices: SetChoicesSchema.optional(),
-    })
-    .nullable(),
+  fitted: FittedSuspensionSchema.nullable(),
+  /** Other suspensions for this axle (v27): offered in the axle's slot, one chosen per configuration; `fitted` is the default. */
+  alternates: z.array(FittedSuspensionSchema).optional(),
 });
 
 
@@ -736,7 +741,12 @@ export const ProjectV26Schema = ProjectV25Schema.extend({
   formatVersion: z.literal(26),
 });
 
-export const ProjectSchema = ProjectV26Schema;
+/** v27: other suspensions on an axle (axle.alternates), one chosen per configuration. */
+export const ProjectV27Schema = ProjectV26Schema.extend({
+  formatVersion: z.literal(27),
+});
+
+export const ProjectSchema = ProjectV27Schema;
 export type Project = z.infer<typeof ProjectSchema>;
 export type PartVersion = z.infer<typeof PartVersionSchema>;
 export type ProjectMeta = z.infer<typeof ProjectMetaSchema>;

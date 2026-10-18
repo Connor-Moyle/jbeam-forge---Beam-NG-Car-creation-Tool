@@ -36,7 +36,7 @@ import { Box3, Matrix4, Vector3 } from 'three';
 import { emitTestSignal } from './testBus';
 import { currentTaxonomy, loadUserTaxonomy } from '@renderer/parts/taxonomy';
 import { buildSimModel } from '@shared/sim/model';
-import { offerAutoClassify } from '@renderer/parts/commands';
+import { offerAutoClassify, setIgnored } from '@renderer/parts/commands';
 import { useStructureUi } from '@renderer/structure/generate';
 import { useEditStore } from '@renderer/structure/editStore';
 import { splitCentreLine } from '@renderer/split/splitTool';
@@ -59,7 +59,7 @@ import { GameLogDialog } from '@renderer/export/GameLogDialog';
 import { ReadinessDialog } from '@renderer/export/ReadinessDialog';
 import { checkGameVersion } from '@renderer/export/gameVersion';
 import { useWorkspaceBridge } from '@renderer/shell/workspaceBridge';
-import { fitSuspension, setUpAxles } from '@renderer/suspension/commands';
+import { addSuspensionOption, fitSuspension, setUpAxles } from '@renderer/suspension/commands';
 import { addEngineOption, fitPowertrain } from '@renderer/powertrain/commands';
 import { addFromTemplate } from '@renderer/scripts/commands';
 import { BUILT_IN_TEMPLATES } from '@shared/lua/library';
@@ -154,10 +154,11 @@ function AppEffects() {
           const sets = (await call(kind === 'suspension' ? 'suspension:catalogue' : 'powertrain:catalogue', undefined)) ?? [];
           const set = sets.find((x) => x.id === setId);
           if (!set) throw new Error(`no set ${setId}`);
-          if (target.startsWith('axle:')) {
-            const axle = projectStore.getState().doc?.axles?.[Number(target.slice(5))];
+          if (target.startsWith('axle:') || target.startsWith('axleOption:')) {
+            const axle = projectStore.getState().doc?.axles?.[Number(target.split(':')[1])];
             if (!axle) throw new Error(`no axle ${target}`);
-            await fitSuspension(axle.id, set);
+            if (target.startsWith('axle:')) await fitSuspension(axle.id, set);
+            else await addSuspensionOption(axle.id, set);
           } else if (target === 'engineOption') await addEngineOption(set);
           else await fitPowertrain(target as 'engine' | 'gearbox', set);
           return true;
@@ -246,6 +247,13 @@ function AppEffects() {
           const re = new RegExp(pattern, 'i');
           const keys = Object.values(useSceneStore.getState().sources).flatMap((s) => s.meshes.filter((m) => re.test(m.name)).map((m) => m.key));
           useSceneStore.getState().setHidden(keys, hidden);
+          return keys.length;
+        },
+        /** Ignore (leave out of the export) every mesh whose name matches, as the Scene's "Ignore" does. */
+        ignoreMeshes: (pattern: string, ignored = true) => {
+          const re = new RegExp(pattern, 'i');
+          const keys = Object.values(useSceneStore.getState().sources).flatMap((s) => s.meshes.filter((m) => re.test(m.name)).map((m) => m.key));
+          setIgnored(keys, ignored);
           return keys.length;
         },
         setReferenceStructure: (ref: { nodes: { id: string; pos: [number, number, number] }[]; beams: [string, string][] } | null) =>

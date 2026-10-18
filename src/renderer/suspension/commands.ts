@@ -18,6 +18,7 @@ import { cornerTargets } from '@renderer/objects/placeObject';
 import { assignToNewPart } from '@renderer/parts/commands';
 import { IDENTITY_EDIT } from '@shared/mesh/meshEdit';
 import { setTrack, setWheels } from '@shared/suspension/wheels';
+import { axleTags } from '@shared/export/jbeam';
 
 /**
  * Suspension workshop (Phase 10): the car's axles, and complete suspensions
@@ -50,7 +51,7 @@ export async function loadFittedSets(): Promise<void> {
   const doc = projectStore.getState().doc;
   const pt = doc?.powertrain;
   const ids = [
-    ...(doc?.axles ?? []).flatMap((a) => (a.fitted ? [a.fitted.setId] : [])),
+    ...(doc?.axles ?? []).flatMap((a) => [...(a.fitted ? [a.fitted.setId] : []), ...(a.alternates ?? []).map((s) => s.setId)]),
     ...(pt?.engine ? [pt.engine.setId] : []),
     ...(pt?.alternates ?? []).map((a) => a.setId),
     ...(pt?.gearbox ? [pt.gearbox.setId] : []),
@@ -64,13 +65,17 @@ export async function loadFittedSets(): Promise<void> {
 }
 
 /** Which axle the picker is choosing for. */
-export const useSuspensionUi = create<{ axleId: string | null; tuneId: string | null; driveId: string | null; pick: (id: string | null) => void; tune: (id: string | null) => void; drive: (id: string | null) => void }>()((set) => ({
+export const useSuspensionUi = create<{ axleId: string | null; optionAxleId: string | null; tuneId: string | null; driveId: string | null; wheelId: string | null; pick: (id: string | null) => void; pickOption: (id: string | null) => void; tune: (id: string | null) => void; drive: (id: string | null) => void; wheels: (id: string | null) => void }>()((set) => ({
   axleId: null,
+  optionAxleId: null,
   tuneId: null,
   driveId: null,
-  pick: (axleId) => set({ axleId, tuneId: null, driveId: null }),
-  tune: (tuneId) => set({ tuneId, axleId: null, driveId: null }),
-  drive: (driveId) => set({ driveId, axleId: null, tuneId: null }),
+  wheelId: null,
+  pick: (axleId) => set({ axleId, optionAxleId: null, tuneId: null, driveId: null, wheelId: null }),
+  pickOption: (optionAxleId) => set({ optionAxleId, axleId: null, tuneId: null, driveId: null, wheelId: null }),
+  tune: (tuneId) => set({ tuneId, axleId: null, optionAxleId: null, driveId: null, wheelId: null }),
+  drive: (driveId) => set({ driveId, axleId: null, optionAxleId: null, tuneId: null, wheelId: null }),
+  wheels: (wheelId) => set({ wheelId, axleId: null, optionAxleId: null, tuneId: null, driveId: null }),
 }));
 
 /** Which sets suit an axle: front sets for the first, rear for the others; "any" fits both. */
@@ -150,15 +155,31 @@ function boxOfSource(sourceId: string, only?: RegExp): Box3 {
 
 /** Fitting a suspension imports, places, assigns and records it: one undo step. */
 export function fitSuspension(axleId: string, set: SuspensionSet): Promise<void> {
-  return projectStore.getState().group(`Fit ${set.vehicleName} ${set.name}`, () => fitSuspensionSteps(axleId, set));
+  return projectStore.getState().group(`Fit ${set.vehicleName} ${set.name}`, () => fitSuspensionSteps(axleId, set, false));
+}
+
+/** Another suspension for an axle, offered in its slot: each configuration picks one; the fitted one stays the default. */
+export function addSuspensionOption(axleId: string, set: SuspensionSet): Promise<void> {
+  return projectStore.getState().group(`Add suspension option ${set.vehicleName} ${set.name}`, () => fitSuspensionSteps(axleId, set, true));
+}
+
+export function removeSuspensionOption(axleId: string, sourceId: string): void {
+  projectStore.getState().execute({
+    label: 'Remove suspension option',
+    apply: (d) => {
+      const a = d.axles.find((x) => x.id === axleId);
+      if (a?.alternates?.some((s) => s.sourceId === sourceId)) removeSourceFromDoc(d, sourceId);
+    },
+  });
 }
 
 /**
  * Fit a complete suspension to an axle: it comes in as its own model (the
  * game's materials, its parts classified), centred on the car, its hubs on
- * the axle line at wheel-centre height. Replaces what was on the axle.
+ * the axle line at wheel-centre height. Replaces what was on the axle, or
+ * (`asOption`) joins it as another suspension the axle's slot offers.
  */
-async function fitSuspensionSteps(axleId: string, set: SuspensionSet): Promise<void> {
+async function fitSuspensionSteps(axleId: string, set: SuspensionSet, asOption: boolean): Promise<void> {
   const doc = projectStore.getState().doc;
   const axle = doc?.axles.find((a) => a.id === axleId);
   if (!doc || !axle) return;
@@ -198,6 +219,21 @@ async function fitSuspensionSteps(axleId: string, set: SuspensionSet): Promise<v
   const keys = (useSceneStore.getState().sources[sourceId]?.meshes ?? []).map((m) => m.key);
   const axles = projectStore.getState().doc?.axles ?? [];
   assignToNewPart(keys, { taxonomyId: 'suspension_set', position: axleKind(axles, axle) === 'front' ? 'F' : 'R' });
+  if (asOption && axle.fitted) {
+    projectStore.getState().execute({
+      label: `Add suspension option ${set.vehicleName} ${set.name}`,
+      apply: (d) => {
+        const a = d.axles.find((x) => x.id === axleId);
+        if (!a?.fitted) return;
+        a.alternates = [...(a.alternates ?? []), { setId: set.id, name: set.name, vehicle: set.vehicleName, type: set.type, sourceId, ...(native ? { track: native } : {}) }];
+        for (const [src, tag] of axleTags(a, d.axles.indexOf(a))) for (const s of a.alternates) if (s.sourceId === src && !s.tag) s.tag = tag;
+      },
+    });
+    // Both suspensions sit on the same axle: show the fitted one.
+    useSceneStore.getState().setHidden(keys, true);
+    useUiStore.getState().pushStatus(`Added the ${set.vehicleName} ${set.name} as another suspension for the ${axle.name.toLowerCase()}. Each configuration picks one; it's hidden here while the fitted one shows.`, 'success', 9000);
+    return;
+  }
   projectStore.getState().execute({
     label: `Fit ${set.vehicleName} ${set.name}`,
     apply: (d) => {
@@ -328,13 +364,14 @@ export function resetDriveline(axleId: string): void {
   });
 }
 
-/** The game's other parts for an axle's suspension: fitted defaults and in-game choices. */
-export function setSuspensionChoices(axleId: string, choices: SetChoices): void {
+/** The game's other parts for an axle's suspension: fitted defaults and in-game choices (`sourceId`: one of the axle's other suspensions instead). */
+export function setSuspensionChoices(axleId: string, choices: SetChoices, sourceId?: string): void {
   projectStore.getState().execute({
     label: 'Choose suspension parts',
     apply: (d) => {
       const a = d.axles.find((x) => x.id === axleId);
-      if (a?.fitted) a.fitted.choices = choices;
+      const s = sourceId ? a?.alternates?.find((x) => x.sourceId === sourceId) : a?.fitted;
+      if (s) s.choices = choices;
     },
   });
 }

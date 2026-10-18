@@ -329,6 +329,24 @@ function shiftSlotOffsets(table: JbeamValue, offset: V3, lateral = 1): JbeamValu
 }
 
 /** Replace every string equal to a key of `map`, anywhere in the value. */
+/**
+ * Formulas that switch on one of the original car's component flags ("$= $components.chassisStiffening
+ * == true and 3.0 or 2.0", the Sunburst's rally arms): the mod declares no components, so the game
+ * takes the "or" value. Written out as that value, so every reader of the mod sees the same number.
+ */
+const COMPONENT_SWITCH = /^\$=\s*\$components\.\w+\s*==\s*true\s+and\s+(\S+)\s+or\s+(\S+)\s*$/;
+export function bakeComponents(value: JbeamValue): JbeamValue {
+  if (typeof value === 'string') {
+    const m = COMPONENT_SWITCH.exec(value);
+    if (!m) return value;
+    const n = Number(m[2]);
+    return Number.isFinite(n) ? n : value;
+  }
+  if (Array.isArray(value)) return value.map(bakeComponents);
+  if (isJbeamObject(value)) return Object.fromEntries(Object.entries(value).map(([k, v]) => [k, bakeComponents(v)]));
+  return value;
+}
+
 function renameStrings(value: JbeamValue, map: ReadonlyMap<string, string>): JbeamValue {
   if (typeof value === 'string') return map.get(value) ?? value;
   if (Array.isArray(value)) return value.map((v) => renameStrings(v, map));
@@ -342,7 +360,10 @@ function renameStrings(value: JbeamValue, map: ReadonlyMap<string, string>): Jbe
  */
 const HUB_NODE = /^[fr]w1(?:l{1,2}|r{1,2})$/i;
 
-export function transplantSuspension(input: TransplantInput): TransplantResult {
+export function transplantSuspension(given: TransplantInput): TransplantResult {
+  // Component switches baked first: the weights below read the numbers (a formula read as 25 kg
+  // gave a 2 kg node mounts stiff enough to throw it off at spawn).
+  const input: TransplantInput = { ...given, parts: Object.fromEntries(Object.entries(given.parts).map(([n, p]) => [n, bakeComponents(p) as JbeamObject])) };
   const lateral = input.lateral && input.lateral > 0 ? input.lateral : 1;
   const warnings: string[] = [];
   const partNames = new Map(Object.keys(input.parts).map((n) => [n, `${input.partPrefix}${n}`]));

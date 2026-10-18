@@ -1,6 +1,9 @@
 import { isJbeamObject, type JbeamObject, type JbeamValue } from '../jbeam/parse';
 import { slotTypesOf } from '../jbeam/slots';
 
+/** A part the game has for every car (its common wheels and tyres): never copied into a mod. */
+export const isGameWheelPart = (body: JbeamObject | undefined): boolean => /^(wheel|tire)_[FR]_/i.test(slotTypesOf(body)[0] ?? '');
+
 /**
  * The game's alternative parts for a fitted set (suspension, engine or
  * gearbox): for each slot its parts declare (brakes, steering rack,
@@ -122,13 +125,14 @@ export function findOptions(set: readonly string[], find: (name: string) => Jbea
  * no choices.
  */
 export function applyChoices<T extends { parts: Record<string, JbeamObject>; anchors: Record<string, [number, number, number]> }>(data: T, options: SetOptions | undefined, choices: SetChoices | undefined): T {
-  if (!options || !choices || !Object.keys(choices).length) return data;
-  const all = (n: string) => data.parts[n] ?? options.parts[n];
+  if (!choices || !Object.keys(choices).length) return data;
+  const all = (n: string) => data.parts[n] ?? options?.parts[n];
   const parts: Record<string, JbeamObject> = { ...data.parts };
   for (const [slot, c] of Object.entries(choices)) {
-    const known = options.slots.find((s) => s.slotType === slot);
-    if (!known) continue;
-    for (const p of [c.default, ...c.offer]) if (p) for (const q of closureOf(p, all, 12)) parts[q] ??= structuredClone(options.parts[q] ?? data.parts[q]!);
+    // The game's wheels and tyres fit every car as they are: the slot stays the game's (so every
+    // wheel of that lug count is in the parts menu) and only its default changes. Copied in, the
+    // slot was renamed to the mod's and took only the copies.
+    for (const p of [c.default, ...c.offer]) if (p) for (const q of closureOf(p, all, 12)) if (!parts[q] && all(q) && !isGameWheelPart(all(q))) parts[q] = structuredClone(all(q)!);
     // Switch the default wherever the slot is declared.
     for (const [name, body] of Object.entries(parts)) {
       const rows = slotRows(body).filter((r) => r.key === slot && r.col >= 0 && r.def !== c.default);
@@ -138,5 +142,5 @@ export function applyChoices<T extends { parts: Record<string, JbeamObject>; anc
       parts[name] = copy;
     }
   }
-  return { ...data, parts, anchors: { ...options.anchors, ...data.anchors } };
+  return { ...data, parts, anchors: { ...(options?.anchors ?? {}), ...data.anchors } };
 }

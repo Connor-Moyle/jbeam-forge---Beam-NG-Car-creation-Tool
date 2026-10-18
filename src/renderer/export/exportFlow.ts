@@ -295,6 +295,15 @@ export function prepareExport(): PreparedExport | null {
     const text = set ? suspensionLoadWarning(set, a.name.replace(/ axle$/i, '').toLowerCase(), defaultWeightKg) : null;
     if (text) report.warnings.push({ code: 'SUSPENSION_LOAD', message: text });
   }
+  // A suspension stretched or squeezed far from its own width: the Sunburst's rally struts squeezed
+  // to 84% threw a lower ball joint off at spawn. A warning, with the number.
+  for (const a of fittedAxles) {
+    for (const s of [a.fitted!, ...(a.alternates ?? [])]) {
+      const ratio = s.track ? a.track / s.track : 1;
+      if (ratio < 0.9 || ratio > 1.15)
+        report.warnings.push({ code: 'TRACK_STRETCH', message: `${s.name} on the ${a.name.replace(/ axle$/i, '').toLowerCase()} axle is ${ratio < 1 ? 'squeezed' : 'stretched'} to ${Math.round(ratio * 100)}% of its own width (${(s.track! * 1000).toFixed(0)} mm): more than about 10% either way can make its arms fight and come apart at spawn. Keep the axle's track near ${(s.track! * 1000).toFixed(0)} mm, or pick a suspension from a car this wide.` });
+    }
+  }
   // Structure of the car's own that starts inside a fitted suspension's tyres.
   const partNames = new Map(doc.parts.map((p) => [p.id, p.displayName]));
   const ownNodes = doc.nodes.filter((n) => partNames.has(n.partId) && !SET_KINDS.has(doc.parts.find((p) => p.id === n.partId)?.taxonomyId ?? '')).map((n) => ({ pos: n.pos, part: partNames.get(n.partId)! }));

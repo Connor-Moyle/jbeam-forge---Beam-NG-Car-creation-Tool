@@ -22,6 +22,7 @@ import { vehicleLogReport } from '@shared/beamng/logReport';
 import { measuredFigures } from '@shared/export/performance';
 import { vehicleClashes } from '../export/clashes';
 import { engineSoundSamples, readSoundFile, scanEngineSounds, scanHorns } from '../beamng/engineSounds';
+import { scanWheels } from '../beamng/wheels';
 import { AUDIO_EXTENSIONS } from '@shared/sound/blend';
 import type { SetOptions } from '@shared/suspension/options';
 import { collectDiagnostics, copyDiagnosticsToClipboard } from '../diagnostics';
@@ -279,6 +280,10 @@ export function registerIpcHandlers(services: HandlerServices): void {
   registerInvoke('beamng:horns', async () => {
     const dir = installDir();
     return dir ? scanHorns(dir) : [];
+  });
+  registerInvoke('beamng:wheels', async () => {
+    const dir = installDir();
+    return dir ? scanWheels(dir) : [];
   });
   registerInvoke('dialog:pickAudioFiles', async (_req, event) => {
     const paths = await pickOpenFiles(event.sender, { title: 'Your engine recordings', filters: [{ name: 'Recordings', extensions: AUDIO_EXTENSIONS.map((e) => e.slice(1)) }], properties: ['openFile', 'multiSelections'] });

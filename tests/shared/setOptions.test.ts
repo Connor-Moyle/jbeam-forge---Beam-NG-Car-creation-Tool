@@ -45,9 +45,14 @@ describe('applyChoices', () => {
     expect(slotRows(game.car_suspension_F!)[0]!.def).toBe('car_brake_F');
   });
 
-  it('is a no-op without choices or options', () => {
+  it('is a no-op without choices', () => {
     expect(applyChoices(data, options, {})).toBe(data);
-    expect(applyChoices(data, undefined, { car_brake_F: { default: 'car_brake_F_sport', offer: [] } })).toBe(data);
+  });
+
+  it('without options (the game not scanned) still switches the default, copying nothing', () => {
+    const out = applyChoices(data, undefined, { car_brake_F: { default: 'car_brake_F_sport', offer: [] } });
+    expect(slotRows(out.parts.car_suspension_F!)[0]!.def).toBe('car_brake_F_sport');
+    expect(Object.keys(out.parts).sort()).toEqual(set.slice().sort());
   });
 
   it('transplants into one slot the game offers every choice for', () => {

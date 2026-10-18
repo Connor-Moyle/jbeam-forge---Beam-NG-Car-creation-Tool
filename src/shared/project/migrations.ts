@@ -198,6 +198,12 @@ export const MIGRATIONS: readonly Migration[] = [
     describe: 'the track of a fitted suspension, so the axle’s track can widen or narrow it; the car’s sounds',
     migrate: (doc) => ({ ...doc, formatVersion: 26 }),
   },
+  {
+    from: 26,
+    // Nothing to change: an axle's other suspensions are new and optional.
+    describe: 'other suspensions on an axle, one chosen per configuration',
+    migrate: (doc) => ({ ...doc, formatVersion: 27 }),
+  },
 ];
 
 export class MigrationError extends Error {

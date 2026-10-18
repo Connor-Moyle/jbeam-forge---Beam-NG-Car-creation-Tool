@@ -26,6 +26,8 @@ const TIMEOUT = 15_000;
 const only = process.argv.find((a) => a.startsWith('--only='))?.slice(7).split(',');
 // Optional local smoke model (never committed), e.g. --model=scratch/test-models/sunburst2/sunburst2.dae
 const smokeModel = process.argv.find((a) => a.startsWith('--model='))?.slice(8);
+// A showcase car model (scripts/dev/buildShowcaseCars.mts), e.g. --showcase=artifacts/showcase/crawler/forge_crawler.obj
+const showcaseModel = process.argv.find((a) => a.startsWith('--showcase='))?.slice(11);
 // Optional local project someone assigned by hand (opened read-only: never saved), e.g. --project="Template Car/hirochi_sunburst_6.jbforge"
 const userProject = process.argv.find((a) => a.startsWith('--project='))?.slice(10);
 const exportProject = process.argv.find((a) => a.startsWith('--export-project='))?.slice(17);
@@ -185,6 +187,61 @@ function writePng(path, w, h) {
 }
 
 const projectFile = join(userData, 'projects', 'harness_test_car.jbforge');
+
+/**
+ * How each showcase car (scripts/dev/buildShowcaseCars.mts) is built through the app: the game's
+ * suspensions and wheels, its engines, and the versions a configuration makes of the parts.
+ * A pick is [slot label pattern, option label pattern | 'empty'].
+ */
+const SHOWCASE_CARS = {
+  forge_crawler: {
+    name: 'Forge Crawler',
+    axles: ['hopper/hopper_suspension_F_crawler', 'hopper/hopper_suspension_R_crawler'],
+    // Other suspensions each version picks from: the Hopper's road live axles, the D-Series desert truck's.
+    axleOptions: [
+      ['hopper/hopper_suspension_F', 'pickup/pickup_desert_suspension_SFA'],
+      ['hopper/hopper_suspension_R', 'pickup/pickup_desert_suspension_R'],
+    ],
+    track: 1.68,
+    wheels: 'Off-Road',
+    engine: 'hopper/hopper_engine_v8_4.5',
+    gearbox: 'hopper/hopper_transmission_5M',
+    engineOptions: ['bx/bx_engine_v8_5.5', 'hopper/hopper_engine_v8_6.9', 'hopper/hopper_engine_i4'],
+    hinges: true,
+    features: ['hitch', 'nitrous'],
+    horn: /Horn 0[4-9]/,
+    configs: [
+      { name: 'Rock Crawler', type: 'Factory', picks: [[/^Front bumper$/, /Offroad/], [/^Rear bumper$/, /Offroad/], [/^Roof$/, 'empty'], [/side skirt$/, /Offroad/], [/^Fender flare$/, /Wide/], [/^Rear wing$/, 'empty'], [/^Splitter$/, 'empty'], [/^Diffuser$/, 'empty'], [/^Exocage$/, 'empty'], [/^Engine$/, /4\.5L V8/], [/axle suspension$/, /Crawler/]] },
+      { name: 'Drift', type: 'Custom', picks: [[/^Front bumper$/, /Drift/], [/^Rear bumper$/, /Race/], [/^Roof$/, /Carbon/], [/^Rear wing$/, /Race/], [/^Exhaust$/, /Race/], [/seat$/, /Race/], [/door$/, /Race/], [/^Exocage$/, 'empty'], [/^Snorkel$/, 'empty'], [/^Light bar$/, 'empty'], [/^Spare wheel/, 'empty'], [/^Bull bar/, 'empty'], [/skid plate$/, 'empty'], [/mud ?flap/i, 'empty'], [/^Splitter$/, 'empty'], [/^Engine$/, /5\.5L V8/], [/axle suspension$/, /Hopper Live Axle/]] },
+      { name: 'Trophy Truck', type: 'Race', picks: [[/^Front bumper$/, /Offroad/], [/^Rear bumper$/, /Offroad/], [/^Hood$/, /Race/], [/^Roof$/, 'empty'], [/^Windshield$/, /Cut/], [/^Fender flare$/, /Wide/], [/side skirt$/, /Offroad/], [/^Exhaust$/, /Race/], [/seat$/, /Race/], [/door$/, /Race/], [/^Rear wing$/, 'empty'], [/^Splitter$/, 'empty'], [/^Diffuser$/, 'empty'], [/^Spare wheel/, 'empty'], [/^Engine$/, /6\.9L V8/], [/axle suspension$/, /D-Series/]] },
+      { name: 'Race', type: 'Race', picks: [[/^Front bumper$/, /Race/], [/^Rear bumper$/, /Race/], [/^Hood$/, /Race/], [/^Roof$/, /Carbon/], [/^Windshield$/, /Cut/], [/^Rear wing$/, /Race/], [/^Exhaust$/, /Race/], [/seat$/, /Race/], [/door$/, /Race/], [/^Exocage$/, 'empty'], [/^Snorkel$/, 'empty'], [/^Light bar$/, 'empty'], [/^Spare wheel/, 'empty'], [/^Bull bar/, 'empty'], [/mud ?flap/i, 'empty'], [/^Engine$/, /2\.5L I4/], [/axle suspension$/, /Hopper Live Axle/]] },
+    ],
+  },
+  forge_gp60: {
+    name: 'Forge GP60',
+    axles: ['bolide/bolide_race_suspension_F', 'bolide/bolide_race_suspension_R'],
+    // The Bolide's road suspension, and the Autobello's off-road trailing links (a car as narrow as this one) for the dirt versions.
+    axleOptions: [
+      ['bolide/bolide_suspension_F', 'autobello/autobello_suspension_F_offroad'],
+      ['bolide/bolide_suspension_R', 'autobello/autobello_suspension_R_offroad'],
+    ],
+    track: 1.26,
+    wheels: '15x',
+    engine: 'bolide/bolide_engine_3.2_v8',
+    gearbox: 'bolide/bolide_transaxle_5M_race',
+    engineOptions: ['bolide/bolide_engine_3.9_v8', 'bolide/bolide_engine_v6_3.3', 'sunburst2/sunburst2_engine_2_5'],
+    hinges: false,
+    features: ['nitrous'],
+    horn: /Horn 0[2-9]/,
+    configs: [
+      { name: 'Grand Prix', type: 'Factory', picks: [[/^Rear wing$/, 'empty'], [/^Splitter$/, 'empty'], [/^Diffuser$/, 'empty'], [/^Roll cage$/, 'empty'], [/^Light bar$/, 'empty'], [/^Snorkel$/, 'empty'], [/mud ?flap/i, 'empty'], [/skid plate$/, 'empty'], [/^Headlight/i, 'empty'], [/^Engine$/, /3\.2L V8/], [/axle suspension$/, /Bolide Independent/]] },
+      { name: 'Race', type: 'Race', picks: [[/^Front bumper$/, /Race/], [/^Rear bumper$/, /Race/], [/^Rear wing$/, /Race/], [/side skirt$/, /Race/], [/^Intake$/, /Race/], [/^Exhaust$/, /Race/], [/seat$/, /Race/], [/^Windshield$/, /Cut/], [/^Engine cover$/, 'empty'], [/^Roll cage$/, 'empty'], [/^Light bar$/, 'empty'], [/^Snorkel$/, 'empty'], [/mud ?flap/i, 'empty'], [/fender$/, 'empty'], [/quarter panel$/, 'empty'], [/^Headlight/i, 'empty'], [/^Engine$/, /3\.9L V8/], [/axle suspension$/, /Bolide Race/]] },
+      { name: 'Rally', type: 'Custom', picks: [[/^Front bumper$/, /Offroad/], [/^Rear bumper$/, /Offroad/], [/^Rear wing$/, 'empty'], [/^Splitter$/, 'empty'], [/^Diffuser$/, 'empty'], [/^Roll cage$/, 'empty'], [/^Light bar$/, 'empty'], [/^Engine$/, /2\.5L F4/], [/axle suspension$/, /Autobello/]] },
+      { name: 'Drift', type: 'Custom', picks: [[/^Front bumper$/, /Drift/], [/^Rear bumper$/, /Race/], [/^Exhaust$/, /Race/], [/^Splitter$/, 'empty'], [/^Roll cage$/, 'empty'], [/^Light bar$/, 'empty'], [/^Snorkel$/, 'empty'], [/mud ?flap/i, 'empty'], [/skid plate$/, 'empty'], [/fender$/, 'empty'], [/quarter panel$/, 'empty'], [/^Headlight/i, 'empty'], [/^Engine$/, /3\.3L V6/], [/axle suspension$/, /Bolide Independent/]] },
+      { name: 'Trophy', type: 'Race', picks: [[/^Front bumper$/, /Offroad/], [/^Rear bumper$/, /Offroad/], [/^Intake$/, /Race/], [/^Exhaust$/, /Race/], [/seat$/, /Race/], [/^Rear wing$/, 'empty'], [/^Splitter$/, 'empty'], [/^Diffuser$/, 'empty'], [/^Roll bar$/, 'empty'], [/^Engine$/, /3\.9L V8/], [/axle suspension$/, /Autobello/]] },
+    ],
+  },
+};
 
 const scenarios = [
   {
@@ -3125,6 +3182,17 @@ const scenarios = [
       await page.waitForTimeout(1000);
       const axles = (await hook(page, 'projectDoc')).axles;
       assert(axles.length >= 2 && axles.every((a) => a.fitted), `front and rear suspensions fitted (${axles.map((a) => a.fitted?.setId ?? 'none').join(', ')}; rear: ${rearType})`);
+      // Wheels from the game's common set, through the picker: the biggest size listed, matching rears too.
+      await page.getByTestId('axle-wheels').first().click();
+      await page.getByTestId('wheel-picker').waitFor();
+      await page.getByTestId('wheel-row').first().waitFor({ timeout: 30_000 });
+      await page.getByTestId('wheel-size').last().click();
+      await page.getByTestId('wheel-fit').first().click();
+      const wheelChoice = Object.values((await hook(page, 'projectDoc')).axles[0].fitted.choices ?? {})[0]?.default;
+      assert(wheelChoice, 'a game wheel chosen for the front axle');
+      await shot(page, 'practice-real-wheels');
+      await page.getByRole('button', { name: 'Back' }).first().click();
+      await page.getByTestId('suspension-panel').waitFor();
       // An engine and gearbox from the game.
       await page.getByTestId('toggle-powertrain').click();
       await page.getByTestId('powertrain-panel').waitFor();
@@ -3247,6 +3315,9 @@ const scenarios = [
       writeFileSync(join(outDir, 'practice-real-stability-configs.txt'), checks2.map((c) => `${c.pc}\n${c.r.stdout}${c.r.stderr}`).join('\n'));
       assert(lint.status === 0, `the mod lints clean:\n${(lint.stdout + lint.stderr).split('\n').slice(0, 25).join('\n')}`);
       assert(/RUN: \d+ steps .* stable/.test(check.stdout), `holds together at 2000 Hz:\n${check.stdout.split('\n').filter((l) => /RUN|worst|nodes,/.test(l)).join('\n')}${check.stderr.slice(0, 400)}`);
+      // The chosen wheel is the hub's default, and the game's wheel itself isn't copied into the mod.
+      const jbeams = readdirSync(vdir).filter((f) => f.endsWith('.jbeam'));
+      assert(jbeams.some((f) => readFileSync(join(vdir, f), 'utf8').includes(`"${wheelChoice}"`)) && !jbeams.some((f) => f.includes(wheelChoice)), `the hub takes ${wheelChoice} without carrying it`);
       assert(pcs.length >= 1, `the second configuration is exported (${readdirSync(vdir).filter((f) => f.endsWith('.pc')).join(', ')})`);
       for (const c of checks2) assert(/RUN: \d+ steps .* stable/.test(c.r.stdout), `${c.pc} holds together at 2000 Hz:\n${c.r.stdout.split('\n').filter((l) => /RUN|worst/.test(l)).join('\n')}${c.r.stderr.slice(0, 300)}`);
       for (let i = 0; i < 3 && (await page.locator('[role=dialog]').count()); i++) await page.keyboard.press('Escape');
@@ -4269,6 +4340,17 @@ const scenarios = [
         zip.end();
         zip.outputStream.pipe(createWriteStream(join(fakeInstall, 'content', 'vehicles', 'fakesusp.zip'))).on('close', resolve).on('error', reject);
       });
+      // The game's wheels (vehicles/common), two that fit the hubs' wheel_F_5 slot: one plain-named, one with the game's translated name.
+      const wheelsJbeam = {
+        fake_wheel_01_15x7_F: { information: { name: '15x7 Steel Front Wheels', value: 100 }, slotType: 'wheel_F_5', slots: [['type', 'default', 'description'], ['tire_F_15x7', 'tire_F_195_65_15_standard', 'Front Tires']] },
+        fake_wheel_02_17x8_F: { information: { name: { txt: 'ui.vehicleconfig.generic.wheelName', ctx: { size: '17x8', type: { txt: 'ui.vehicleconfig.information.type.BRAND Luxe Front Wheels', ctx: { brand1: 'ui.vehicleconfig.brand.Forge' } } } }, value: 500 }, slotType: 'wheel_F_5', slots: [['type', 'default', 'description'], ['tire_F_17x8', 'tire_F_225_45_17_standard', 'Front Tires']] },
+      };
+      await new Promise((resolve, reject) => {
+        const zip = new yazl.ZipFile();
+        zip.addBuffer(Buffer.from(JSON.stringify(wheelsJbeam)), 'vehicles/common/wheels/fake/fake_wheels_F_5.jbeam');
+        zip.end();
+        zip.outputStream.pipe(createWriteStream(join(fakeInstall, 'content', 'vehicles', 'common.zip'))).on('close', resolve).on('error', reject);
+      });
       await page.evaluate((dir) => window.forge.invoke('settings:update', { beamngInstallDir: dir }), fakeInstall);
       rmSync(join(userData, 'library-scan', 'beamng', 'parts.fingerprint'), { force: true });
       const scan = await page.evaluate(() => window.forge.invoke('library:rescan'));
@@ -4322,6 +4404,22 @@ const scenarios = [
       const after = await hook(page, 'partCentre', '^Front Left (wheel|tire)$');
       assert(near(after, [want[0], want[1] + 0.05, want[2] + 0.02]), `the wheel follows the suspension (${after.map((v) => v.toFixed(3))})`);
       await shot(page, 'suspension-wheels-moved');
+      // The wheel picker: the game's wheels that fit the set's hubs, by size and brand; the pick is the slot's default.
+      await page.getByTestId('axle-wheels').first().click();
+      await page.getByTestId('wheel-picker').waitFor();
+      await page.getByTestId('wheel-row').first().waitFor();
+      assert((await page.getByTestId('wheel-row').count()) === 2, 'both 5-lug wheels listed');
+      assert((await page.getByTestId('wheel-size').count()) === 2, 'size filters from the wheels');
+      await page.getByTestId('wheel-brand').click();
+      await page.getByRole('option', { name: /^Forge/ }).click();
+      assert((await page.getByTestId('wheel-row').count()) === 1, 'the brand filter narrows the list');
+      assert(/17x8 Forge Luxe/.test(await page.getByTestId('wheel-row').first().textContent()), 'the translated name is readable');
+      await page.getByTestId('wheel-fit').first().click();
+      await shot(page, 'wheel-picker');
+      const picked = (await hook(page, 'projectDoc')).axles[0].fitted.choices;
+      assert(picked?.wheel_F_5?.default === 'fake_wheel_02_17x8_F', `the wheel is the slot's default (${JSON.stringify(picked)})`);
+      await page.getByRole('button', { name: 'Back' }).first().click();
+      await page.getByTestId('suspension-panel').waitFor();
     },
   },
   {
@@ -4497,6 +4595,226 @@ const scenarios = [
       const saved = await hook(page, 'projectState');
       acReport.projectName = saved.name;
       writeFileSync(join(outDir, 'ac-car-report.json'), JSON.stringify(acReport, null, 1));
+    },
+  },
+  {
+    id: 'showcase-build',
+    name: 'a showcase car built end to end through the app: import, sort, generate, game suspension and wheels, engines, sounds, extras, configurations, export (--showcase --beamng-install)',
+    skip: () => !showcaseModel || !realInstall,
+    async run({ page }) {
+      const base = showcaseModel.replace(/\\/g, '/').split('/').pop().replace(/\.obj$/i, '');
+      const plan = SHOWCASE_CARS[base];
+      assert(plan, `a build plan for ${base} (${Object.keys(SHOWCASE_CARS).join(', ')})`);
+      await page.waitForSelector('[data-testid=app-ready]');
+      if (await page.locator('[data-view=editor]').count()) {
+        await hook(page, 'runCommand', 'close');
+        if (await page.getByTestId('unsaved-discard').isVisible({ timeout: 1500 }).catch(() => false)) await page.getByTestId('unsaved-discard').click();
+      }
+      await page.waitForSelector('[data-view=home][data-testid=app-ready]');
+      const invoke = (channel, req) => page.evaluate(async ([c, r]) => (await window.forge.invoke(c, r)).value, [channel, req]);
+      await invoke('settings:update', { beamngInstallDir: realInstall, offerLessons: false });
+      for (let i = 0; i < 3000; i++) {
+        const lib = await invoke('library:status');
+        if (!lib.scanning && (await invoke('suspension:catalogue')).length) break;
+        await page.waitForTimeout(100);
+      }
+      // Import and sort.
+      await page.getByTestId('home-new').click();
+      await page.getByTestId('newmod-name').fill(plan.name);
+      await hook(page, 'queueDialog', [showcaseModel]);
+      await page.getByTestId('newmod-create').click();
+      await page.getByTestId('import-dialog').waitFor({ timeout: 60_000 });
+      await page.getByTestId('import-confirm').click();
+      await page.getByTestId('classify-summary').waitFor({ timeout: 120_000 });
+      for (let i = 0; i < 600 && !(await hook(page, 'sceneStats')).sources.every((x) => x.status === 'ready'); i++) await page.waitForTimeout(100);
+      await page.getByTestId('classify-apply').click();
+      await hook(page, 'setMeta', { slug: base });
+      // Structure.
+      await page.getByTestId('toolbar-generate').click();
+      for (let i = 0; i < 3000 && !((await hook(page, 'projectDoc')).nodes.length > 50); i++) await page.waitForTimeout(100);
+      await page.waitForTimeout(1500);
+      await shot(page, 'showcase-generated');
+      // Axles from the car's own wheels, then the game's suspensions on them, at the car's track.
+      await page.getByTestId('toggle-suspension').click();
+      await page.getByRole('button', { name: 'Set up axles' }).click();
+      await page.getByTestId('suspension-picker').waitFor();
+      await page.getByRole('button', { name: 'Back' }).first().click();
+      for (const [i, setId] of plan.axles.entries()) {
+        await hook(page, 'fitSet', `axle:${i}`, setId);
+        await page.getByTestId('suspension-panel').waitFor({ timeout: 60_000 });
+        await page.waitForTimeout(500);
+        // The other suspensions this axle offers (each version picks one).
+        for (const alt of plan.axleOptions?.[i] ?? []) {
+          await hook(page, 'fitSet', `axleOption:${i}`, alt);
+          await page.waitForTimeout(300);
+        }
+      }
+      assert((await page.getByTestId('axle-options').count()) === plan.axles.length, 'each axle lists its other suspensions');
+      const tracks = page.getByLabel('Track width');
+      for (let i = 0; i < (await tracks.count()); i++) {
+        await tracks.nth(i).fill(String(plan.track));
+        await tracks.nth(i).press('Enter');
+      }
+      let doc = await hook(page, 'projectDoc');
+      assert(doc.axles.length === 2 && doc.axles.every((a) => a.fitted), `both suspensions fitted (${doc.axles.map((a) => a.fitted?.setId ?? 'none').join(', ')})`);
+      assert(doc.axles.every((a, i) => (a.alternates ?? []).length === (plan.axleOptions?.[i] ?? []).length), `the other suspensions added (${doc.axles.map((a) => (a.alternates ?? []).map((s) => s.setId).join('+')).join(' / ')})`);
+      assert(doc.axles.every((a) => Math.abs(a.track - plan.track) < 0.001), `track set to ${plan.track} m (${doc.axles.map((a) => a.track).join(', ')})`);
+      // The game's wheels through the picker (the car's own wheel meshes were only there to place the axles).
+      await page.getByTestId('axle-wheels').first().click();
+      await page.getByTestId('wheel-picker').waitFor();
+      await page.getByTestId('wheel-row').first().waitFor({ timeout: 30_000 });
+      await page.getByTestId('wheel-search').fill(plan.wheels);
+      await page.waitForTimeout(300);
+      assert((await page.getByTestId('wheel-row').count()) > 0, `wheels matching "${plan.wheels}" for these hubs`);
+      await page.getByTestId('wheel-fit').first().click();
+      await shot(page, 'showcase-wheels');
+      await page.getByRole('button', { name: 'Back' }).first().click();
+      await page.getByTestId('suspension-panel').waitFor();
+      doc = await hook(page, 'projectDoc');
+      const wheelChoices = doc.axles.map((a) => Object.values(a.fitted.choices ?? {})[0]?.default);
+      assert(wheelChoices.every(Boolean), `a game wheel on each axle (${wheelChoices.join(', ')})`);
+      assert((await hook(page, 'ignoreMeshes', '^(wheel|tire)_[FR][LR]$')) === 8, "the car's own wheels and tyres left out of the export");
+      await shot(page, 'showcase-suspension');
+      // Engines: the default, its gearbox, and the others each version picks from.
+      await page.getByTestId('toggle-powertrain').click();
+      await page.getByTestId('powertrain-panel').waitFor();
+      await hook(page, 'fitSet', 'engine', plan.engine);
+      await page.getByTestId('powertrain-panel').waitFor({ timeout: 60_000 });
+      await hook(page, 'fitSet', 'gearbox', plan.gearbox);
+      await page.getByTestId('powertrain-panel').waitFor({ timeout: 60_000 });
+      for (const id of plan.engineOptions) {
+        await hook(page, 'fitSet', 'engineOption', id);
+        await page.waitForTimeout(300);
+      }
+      doc = await hook(page, 'projectDoc');
+      assert(doc.powertrain.engine && doc.powertrain.gearbox && (doc.powertrain.alternates ?? []).length === plan.engineOptions.length, `engine, gearbox and ${plan.engineOptions.length} other engines fitted`);
+      await shot(page, 'showcase-powertrain');
+      // Sound: the horn.
+      await page.getByTestId('workspace-sound').click();
+      await page.getByTestId('sound-panel').waitFor();
+      await page.getByLabel('Horn').click();
+      await page.getByRole('option', { name: plan.horn }).first().click();
+      await shot(page, 'showcase-sound');
+      // Opening panels hinged; extras.
+      if (plan.hinges) {
+        await page.getByTestId('workspace-moving').click();
+        await page.getByTestId('moving-parts').waitFor();
+        await page.getByTestId('moving-hinge-all').click();
+        await page.waitForTimeout(500);
+        assert((await hook(page, 'projectDoc')).hinges.length >= 2, 'doors and lids hinged');
+      }
+      await hook(page, 'applyPreset', 'modelling');
+      await page.getByTestId('toggle-features').click();
+      await page.getByTestId('features-panel').waitFor();
+      for (const kind of plan.features) await page.getByTestId(`feature-${kind}`).getByRole('switch').first().click();
+      // The versions.
+      await page.getByTestId('toggle-configs').click();
+      await page.getByTestId('configs-panel').waitFor();
+      const picked = {};
+      for (const cfg of plan.configs) {
+        await page.getByTestId('config-add').click();
+        await page.getByTestId('config-name').fill(cfg.name);
+        await page.getByLabel('Configuration type').click();
+        await page.getByRole('option', { name: cfg.type }).click();
+        const selects = page.getByTestId('config-slots').locator('button[aria-label$=" part"]');
+        const n = await selects.count();
+        picked[cfg.name] = [];
+        for (let i = 0; i < n; i++) {
+          const label = (await selects.nth(i).getAttribute('aria-label')).replace(/ part$/, '');
+          const rule = cfg.picks.find(([re]) => re.test(label));
+          if (!rule || (await selects.nth(i).isDisabled())) continue;
+          await selects.nth(i).click();
+          const option = page.getByRole('option', { name: rule[1] === 'empty' ? '(empty)' : rule[1] });
+          if (await option.count()) {
+            await option.first().click();
+            picked[cfg.name].push(`${label} → ${rule[1] === 'empty' ? '(empty)' : String(rule[1])}`);
+          } else await page.keyboard.press('Escape');
+        }
+        await shot(page, `showcase-config-${cfg.name.toLowerCase().replace(/\s+/g, '-')}`);
+      }
+      writeFileSync(join(outDir, 'showcase-configs.json'), JSON.stringify(picked, null, 1));
+      for (const cfg of plan.configs) assert(picked[cfg.name].length >= 4, `${cfg.name} picks its parts (${picked[cfg.name].join('; ')})`);
+      // Save the project, then export and install.
+      const projectPath = join(outDir, `${base}.jbforge`);
+      await hook(page, 'queueDialog', [projectPath]);
+      await page.getByTestId('toolbar-save').click();
+      for (let i = 0; i < 100 && !existsSync(projectPath); i++) await page.waitForTimeout(100);
+      await waitSaved(page);
+      await page.getByTestId('toolbar-export').click();
+      await page.getByTestId('export-dialog').waitFor();
+      await shot(page, 'showcase-export-dialog');
+      await page.getByTestId('export-install').click();
+      await page.getByTestId('export-result').waitFor({ timeout: 180_000 });
+      await shot(page, 'showcase-exported');
+      const unpacked = join(fakeUserDir, 'mods', 'unpacked');
+      const mod = readdirSync(unpacked).sort((a, b) => statSync(join(unpacked, b)).mtimeMs - statSync(join(unpacked, a)).mtimeMs)[0];
+      const modDir = join(outDir, `${base}-mod`);
+      cpSync(join(unpacked, mod), modDir, { recursive: true });
+      const tsx = join(ROOT, 'node_modules', 'tsx', 'dist', 'cli.mjs');
+      const lint = spawnSync(process.execPath, [tsx, '--tsconfig', join(ROOT, 'tsconfig.node.json'), join(ROOT, 'scripts', 'lint-mod.ts'), modDir], { encoding: 'utf8', env: { ...process.env, BEAMNG_INSTALL: realInstall } });
+      writeFileSync(join(outDir, 'showcase-lint.txt'), lint.stdout + lint.stderr);
+      const vdir = join(modDir, 'vehicles', readdirSync(join(modDir, 'vehicles'))[0]);
+      const pcs = readdirSync(vdir).filter((f) => f.endsWith('.pc'));
+      const checks = pcs.map((pc) => ({ pc, r: spawnSync(process.execPath, [tsx, join(ROOT, 'scripts', 'dev', 'jbeamStability.mts'), vdir, pc], { encoding: 'utf8', env: { ...process.env, STEPS: '6000' } }) }));
+      writeFileSync(join(outDir, 'showcase-stability.txt'), checks.map((c) => `${c.pc}\n${c.r.stdout}${c.r.stderr}`).join('\n'));
+      assert(lint.status === 0, `the mod lints clean:\n${(lint.stdout + lint.stderr).split('\n').slice(0, 30).join('\n')}`);
+      assert(pcs.length === plan.configs.length + 1, `every version exported (${pcs.join(', ')})`);
+      for (const c of checks) assert(/RUN: \d+ steps .* stable/.test(c.r.stdout), `${c.pc} holds together at 2000 Hz:\n${c.r.stdout.split('\n').filter((l) => /RUN|worst|nodes,/.test(l)).join('\n')}${c.r.stderr.slice(0, 400)}`);
+      for (let i = 0; i < 3 && (await page.locator('[role=dialog]').count()); i++) await page.keyboard.press('Escape');
+    },
+  },
+  {
+    id: 'showcase-look',
+    name: 'a showcase car model imported and sorted into parts, photographed from each side (--showcase)',
+    skip: () => !showcaseModel,
+    async run({ page }) {
+      await page.waitForSelector('[data-testid=app-ready]');
+      if (await page.locator('[data-view=editor]').count()) {
+        await hook(page, 'runCommand', 'close');
+        if (await page.getByTestId('unsaved-discard').isVisible({ timeout: 1500 }).catch(() => false)) await page.getByTestId('unsaved-discard').click();
+      }
+      await page.waitForSelector('[data-view=home][data-testid=app-ready]');
+      await page.getByTestId('home-new').click();
+      await page.getByTestId('newmod-name').fill('Showcase');
+      await hook(page, 'queueDialog', [showcaseModel]);
+      await page.getByTestId('newmod-create').click();
+      await page.getByTestId('import-dialog').waitFor({ timeout: 60_000 });
+      await page.getByTestId('import-confirm').click();
+      await page.getByTestId('classify-summary').waitFor({ timeout: 120_000 });
+      for (let i = 0; i < 600 && !(await hook(page, 'sceneStats')).sources.every((x) => x.status === 'ready'); i++) await page.waitForTimeout(100);
+      await page.getByTestId('classify-apply').click();
+      const ps = await hook(page, 'partsState');
+      const unassigned = (await hook(page, 'sceneStats')).meshes - ps.assigned;
+      writeFileSync(join(outDir, 'showcase-parts.json'), JSON.stringify({ parts: ps.parts, unassigned }, null, 1));
+      assert(unassigned === 0, `every mesh sorted into a part (${unassigned} left over)`);
+      await page.waitForTimeout(500);
+      const views = { 'front-left': [3, 1.6, 3], 'rear-right': [-3, 1.6, -3], side: [4, 1.2, 0.3], top: [0.3, 5, 0.3], cabin: [1.8, 2.4, -0.6] };
+      for (const [name, dir] of Object.entries(views)) {
+        await hook(page, 'viewFrom', dir);
+        await page.waitForTimeout(400);
+        await shot(page, `showcase-${name}`);
+      }
+      // The versions: each kind of variant mesh shown on its own, the other variants and the parts it replaces hidden.
+      const meshNames = (await hook(page, 'sceneStats')).meshNames;
+      const kinds = ['offroad', 'race', 'drift', 'wide', 'carbon', 'cut'];
+      const isVariant = (n) => kinds.some((k) => n.endsWith(`_${k}`));
+      for (const kind of kinds) {
+        const shown = meshNames.filter((n) => n.endsWith(`_${kind}`));
+        if (!shown.length) continue;
+        const hide = meshNames.filter((n) => (isVariant(n) && !n.endsWith(`_${kind}`)) || shown.includes(`${n}_${kind}`));
+        await hook(page, 'hideMeshes', '.', false);
+        await hook(page, 'hideMeshes', `^(${hide.map((n) => n.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')).join('|')})$`, true);
+        await hook(page, 'viewFrom', [3, 1.6, 3]);
+        await page.waitForTimeout(400);
+        await shot(page, `showcase-${kind}`);
+      }
+      // The car as it comes: no variant meshes.
+      await hook(page, 'hideMeshes', '.', false);
+      await hook(page, 'hideMeshes', `^(${meshNames.filter(isVariant).map((n) => n.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')).join('|')})$`, true);
+      await hook(page, 'viewFrom', [3, 1.6, 3]);
+      await page.waitForTimeout(400);
+      await shot(page, 'showcase-stock');
+      await hook(page, 'hideMeshes', '.', false);
     },
   },
   {

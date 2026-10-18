@@ -344,6 +344,10 @@ You can mix both approaches. A per-corner checklist shows what's from your mesh 
 
 **Multiple setups per axle.** Make a "Double Wishbone" and a "DW Drift" and both show up as options in the parts menu. Trucks with three or four axles work too, with each axle set as steered and/or driven.
 
+**Other suspensions for an axle.** With a game suspension fitted, *Add another suspension* puts a second (or third) one from the game in the same slot: each configuration picks one (a crawler's live axles for the rock version, the desert truck's for the trophy version), and the player can swap them in the parts menu. The fitted one stays the default and the one shown in the 3D view.
+
+**Wheels.** *Wheels* on a fitted axle lists every wheel in the game that fits its hubs (same lug count), by size, brand and name, with the price. The pick becomes the wheel the car comes with (the tyres follow its size) and, when the other axle takes the same lugs, the matching rear or front wheel goes on it too. All the other wheels of that lug count stay in the game's parts menu.
+
 **Also:** brakes per axle (disc or drum, size, torque, bias, handbrake, heat) as swappable parts, steering racks as parts, and front and rear subframes that the suspension and engine bolt to. Subframes can break away from the body in a big enough crash.
 
 ### Powertrain

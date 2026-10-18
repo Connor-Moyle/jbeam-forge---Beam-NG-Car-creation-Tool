@@ -9,6 +9,7 @@ export interface LibraryStatus {
 }
 
 import type { SetOptions } from './suspension/options';
+import type { GameWheel } from './wheels/game';
 import type { LogReport } from './beamng/logReport';
 import type { LibraryScript } from './lua/types';
 import type { ExtensionInfo } from './extensions/api';
@@ -321,6 +322,8 @@ export interface InvokeContract {
   'beamng:soundFile': { req: { path: string }; res: Uint8Array | null };
   /** The game's horns (soundscape_horn parts), for the Sound tab. */
   'beamng:horns': { req: undefined; res: { part: string; label: string }[] };
+  /** The game's wheels (every wheel part in vehicles/common), for the wheel picker. */
+  'beamng:wheels': { req: undefined; res: GameWheel[] };
   /** Pick the user's own engine recordings (ogg, wav, flac); their folder is granted for the export's copy. */
   'dialog:pickAudioFiles': { req: undefined; res: string[] };
   /** Material names in the game's vehicle zips (fork), for using a stock material by name. */
@@ -434,6 +437,7 @@ export const INVOKE_CHANNELS = [
   'beamng:soundSamples',
   'beamng:soundFile',
   'beamng:horns',
+  'beamng:wheels',
   'dialog:pickAudioFiles',
   'dialog:pickDirectory',
   'import:pickSource',

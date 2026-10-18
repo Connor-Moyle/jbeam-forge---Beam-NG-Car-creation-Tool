@@ -102,6 +102,7 @@
 }
 
 .chip,
+.chipOn,
 .brand,
 .listItem {
   display: inline-flex;
@@ -120,6 +121,12 @@
 .brand:hover,
 .listItem:hover {
   border-color: var(--accent);
+}
+
+/* A filter chip that is on (the wheel picker's size and brand). */
+.chipOn {
+  border-color: var(--accent);
+  background: var(--accent-dim);
 }
 
 .count {

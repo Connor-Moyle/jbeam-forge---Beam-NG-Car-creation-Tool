@@ -259,6 +259,46 @@ describe('jbeam export', () => {
     expect(groupsOf(rearRim.name)).not.toEqual(['wheel_RL']); // no suspension on that axle: unchanged
   });
 
+  it('offers an axle’s other suspensions in its slot, each a configuration can pick', () => {
+    const { doc, meshes } = carProject();
+    const main = createPart(doc, tax, { taxonomyId: 'suspension_set', id: 'p_front_set' });
+    const alt = createPart(doc, tax, { taxonomyId: 'suspension_set', id: 'p_front_alt' });
+    assignMeshes(doc, ['susp:arm'], main.id);
+    assignMeshes(doc, ['susp2:arm'], alt.id);
+    doc.axles = [{ id: 'a1', name: 'Front', y: -1.3, track: 1.5, steered: true, tuning: {}, ownMeshes: [], fitted: { setId: 'car/front', name: 'Strut', vehicle: 'Car', type: 'strut', sourceId: 'susp' }, alternates: [{ setId: 'car/front_rally', name: 'Rally', vehicle: 'Car', type: 'strut', sourceId: 'susp2' }] }];
+    doc.sources.push({ id: 'susp', placement: { position: [0, 0, 0], rotation: [0, 0, 0], scale: 1 } } as never, { id: 'susp2', placement: { position: [0, 0, 0], rotation: [0, 0, 0], scale: 1 } } as never);
+    const strut = { slotType: 'car_suspension_F', nodes: [['id', 'posX', 'posY', 'posZ'], ['fh1l', 0.7, -1.3, 0.3]] };
+    const rally = { slotType: 'car_suspension_F', nodes: [['id', 'posX', 'posY', 'posZ'], ['fh1l', 0.7, -1.3, 0.4]] };
+    const sets = { 'car/front': { root: 'car_suspension_F', anchors: {}, parts: { car_suspension_F: strut } }, 'car/front_rally': { root: 'car_suspension_F', anchors: {}, parts: { car_suspension_F: rally } } };
+    const files = new Map(buildJbeamFiles(doc, tax, { meshNames: exportMeshNames(doc, meshes), author: 'x', suspensions: sets }).map((f) => [f.part, parsePart(f.text)[1]]));
+    // Both suspensions are in the mod under their own names; the body's slot takes either.
+    expect(files.has('test_F_car_suspension_F') && files.has('test_F2_car_suspension_F')).toBe(true);
+    expect(readTable(files.get('test_F2_car_suspension_F')!.nodes!).records[0]!.values.id).toBe('f2_fh1l');
+    const body = files.get(bodyPart(doc, tax)!.name)!;
+    const slot = readTable(body.slots2!).records.find((r) => r.values.name === 'test_F_car_suspension_F')!;
+    expect(slot.values.allowTypes).toEqual(['test_F_car_suspension_F', 'test_F2_car_suspension_F']);
+    expect(slot.values.default).toBe('test_F_car_suspension_F');
+    // A configuration picks the other one, and only its model is on the car then.
+    const choice = slotChoices(doc, tax, sets).find((s) => s.slotType === 'test_F_car_suspension_F')!;
+    expect(choice.options.map((o) => o.name)).toEqual(['test_F_car_suspension_F', 'test_F2_car_suspension_F']);
+    const pc = resolveConfig(doc, tax, { id: 'c', name: 'Rally', description: '', type: 'Custom', parts: { test_F_car_suspension_F: 'test_F2_car_suspension_F' }, vars: {}, paints: [null, null, null] as [null, null, null] }, sets);
+    const on = includedParts(doc, tax, pc, sets);
+    expect(on.has('p_front_alt') && !on.has('p_front_set')).toBe(true);
+    const base = includedParts(doc, tax, resolveConfig(doc, tax, null, sets), sets);
+    expect(base.has('p_front_set') && !base.has('p_front_alt')).toBe(true);
+  });
+
+  it('leaves a part out once every mesh it had is ignored', () => {
+    const { doc, meshes } = carProject();
+    const rim = createPart(doc, tax, { taxonomyId: 'wheel', position: 'FL', id: 'p_rim' });
+    assignMeshes(doc, ['w:rim'], rim.id);
+    doc.ignoredMeshes.push('w:rim');
+    delete doc.assignments['w:rim'];
+    const files = buildJbeamFiles(doc, tax, { meshNames: exportMeshNames(doc, meshes), author: 'x' });
+    expect(files.some((f) => f.part === rim.name)).toBe(false);
+    expect(slotChoices(doc, tax).some((s) => s.label === rim.displayName)).toBe(false);
+  });
+
   it('stretches a fitted suspension sideways when the axle’s track differs from the set’s own', () => {
     const { doc, meshes } = carProject();
     createPart(doc, tax, { taxonomyId: 'suspension_set', id: 'p_front_set' });

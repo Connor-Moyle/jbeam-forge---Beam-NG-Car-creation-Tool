@@ -30,7 +30,9 @@ export function removeSourceFromDoc(d: Project, sourceId: string): void {
     for (const k of Object.keys(rec)) if (drop(k)) delete rec[k];
   }
   for (const a of d.axles) {
-    if (a.fitted?.sourceId === sourceId) a.fitted = null;
+    if (a.alternates) a.alternates = a.alternates.filter((s) => s.sourceId !== sourceId);
+    // The next suspension option becomes the fitted one.
+    if (a.fitted?.sourceId === sourceId) a.fitted = a.alternates?.shift() ?? null;
     a.ownMeshes = a.ownMeshes.filter((k) => !drop(k));
   }
   if (d.powertrain.alternates) d.powertrain.alternates = d.powertrain.alternates.filter((a) => a.sourceId !== sourceId);

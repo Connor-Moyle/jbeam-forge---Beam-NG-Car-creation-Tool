@@ -113,6 +113,18 @@ export function nodesExported(doc: Pick<Project, 'parts' | 'proxy'>, tax: Taxono
 /** Parts standing in for a fitted suspension, engine or gearbox (replaced by the game's jbeam on export). */
 export const SET_KINDS: ReadonlySet<string> = new Set(['suspension_set', 'engine_set', 'gearbox_set']);
 
+/**
+ * A part with nothing left in it: every mesh it had was ignored (a car's own wheels, stand-ins for
+ * placing the axles) and it has no structure. It is left out of the mod and its configurations.
+ */
+export function isEmptyPart(doc: Pick<Project, 'parts' | 'nodes'> & Partial<Pick<Project, 'assignments' | 'ignoredMeshes'>>, part: Pick<Part, 'id'>, depth = 0): boolean {
+  const ignored = new Set(doc.ignoredMeshes ?? []);
+  if (Object.entries(doc.assignments ?? {}).some(([k, id]) => id === part.id && !ignored.has(k))) return false;
+  if (doc.nodes.some((n) => n.partId === part.id)) return false;
+  // A part that holds others with something in them (a body with nothing assigned yet) is kept: they hang on its slot.
+  return depth > 16 || !doc.parts.some((p) => (p.parentPartId === part.id || p.variantOf === part.id) && !isEmptyPart(doc, p, depth + 1));
+}
+
 /** Axle tags for part and node names: F, R, R2, R3… */
 /** The car's engine slot: every engine fits it. */
 export const engineSlotType = (slug: string) => `${slug}_E_engine`;
@@ -144,6 +156,23 @@ export function engineTags(pt: { engine: { sourceId: string; tag?: string | unde
 
 export function axleTag(i: number): string {
   return i === 0 ? 'F' : i === 1 ? 'R' : `R${i}`;
+}
+
+/** Each of an axle's suspensions' tag in exported part names: the fitted one's is the axle's (F, R); the alternates' are F2, F3… (kept once given). */
+export function axleTags(axle: { fitted: { sourceId: string; tag?: string | undefined } | null; alternates?: readonly { sourceId: string; tag?: string | undefined }[] | undefined }, i: number): Map<string, string> {
+  const out = new Map<string, string>();
+  if (!axle.fitted) return out;
+  out.set(axle.fitted.sourceId, axleTag(i));
+  const used = new Set([axleTag(i), ...(axle.alternates ?? []).flatMap((a) => (a.tag ? [a.tag] : []))]);
+  for (const a of axle.alternates ?? []) if (a.tag) out.set(a.sourceId, a.tag);
+  (axle.alternates ?? []).forEach((a, n) => {
+    if (out.has(a.sourceId)) return;
+    let tag = `${axleTag(i)}${n + 2}`;
+    for (let k = n + 2; used.has(tag); k++) tag = `${axleTag(i)}${k + 1}`;
+    used.add(tag);
+    out.set(a.sourceId, tag);
+  });
+  return out;
 }
 
 export interface JbeamFile {
@@ -467,7 +496,7 @@ export function buildJbeamFiles(fullDoc: Doc, tax: TaxonomyLookup, opts: JbeamEx
   const fittedSources = [...(fullDoc.axles ?? []).flatMap((a) => (a.fitted ? [a.fitted.sourceId] : [])), ...(pt?.engine ? [pt.engine.sourceId] : []), ...(pt?.gearbox ? [pt.gearbox.sourceId] : [])];
   const fitted = new Set(fittedSources);
   const fromFitted = (k: string) => fitted.has(k.slice(0, k.indexOf(':')));
-  const doc: Doc = { ...fullDoc, parts: fullDoc.parts.filter((p) => !SET_KINDS.has(p.taxonomyId)) };
+  const doc: Doc = { ...fullDoc, parts: fullDoc.parts.filter((p) => !SET_KINDS.has(p.taxonomyId) && !isEmptyPart(fullDoc, p)) };
   const setParts = new Set(fullDoc.parts.filter((p) => SET_KINDS.has(p.taxonomyId)).map((p) => p.id));
   const bodyNodes = fullDoc.nodes.filter((n) => !setParts.has(n.partId));
   // Where a borrowed suspension, engine or gearbox bolts on: the body and its structure (frame,
@@ -520,7 +549,13 @@ export function buildJbeamFiles(fullDoc: Doc, tax: TaxonomyLookup, opts: JbeamEx
     const t = bring(axle.fitted.setId, axle.fitted.sourceId, axleTag(i), mountNodes, axle.tuning, undefined, undefined, axle.fitted.choices, axle.edits, blockOfEngine, axle.fitted.track ? axle.track / axle.fitted.track : undefined);
     if (!t) return;
     axleSets.push({ index: i, t });
-    extraSlots.push([t.rootSlotType, [t.rootSlotType], [], t.rootPart, `${axle.name} suspension`]);
+    // The other suspensions for this axle fill the same slot: the player (or a configuration) picks one.
+    const tags = axleTags(axle, i);
+    const others = (axle.alternates ?? []).flatMap((alt) => {
+      const a = bring(alt.setId, alt.sourceId, tags.get(alt.sourceId) ?? `${axleTag(i)}2`, mountNodes, axle.tuning, undefined, undefined, alt.choices, axle.edits, blockOfEngine, alt.track ? axle.track / alt.track : undefined);
+      return a ? [a.rootSlotType] : [];
+    });
+    extraSlots.push([t.rootSlotType, [t.rootSlotType, ...others], [], t.rootPart, `${axle.name} suspension`]);
     // The user's own meshes ride on the set's nodes (every node group the set's meshes used).
     const own = axle.ownMeshes.filter((k) => opts.meshNames.has(k) && !fullDoc.ignoredMeshes.includes(k)).map((k) => opts.meshNames.get(k)!);
     if (own.length) {

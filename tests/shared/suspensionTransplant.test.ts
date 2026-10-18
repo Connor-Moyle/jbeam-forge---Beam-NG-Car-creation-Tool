@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { JbeamObject } from '@shared/jbeam/parse';
-import { definedNodes, externalNodeRefs, planeDistance, setGroups, shiftOffset, slender, thickness, transplantSuspension, tuningVariables, type V3 } from '@shared/suspension/transplant';
+import { bakeComponents, definedNodes, externalNodeRefs, planeDistance, setGroups, shiftOffset, slender, thickness, transplantSuspension, tuningVariables, type V3 } from '@shared/suspension/transplant';
 
 const PARTS: Record<string, JbeamObject> = {
   car_suspension_F: {
@@ -561,5 +561,14 @@ describe('bolting a point to the body', () => {
     const bolts = ((r.parts.m_s!.beams as unknown[]).filter(Array.isArray) as string[][]).filter(([a]) => a === 'f_st3r').map(([, b]) => b);
     expect(bolts.sort()).toEqual(['b1', 'b2', 'b3', 'b5']);
     expect(planeDistance([0, 0, 1], [0, 0, 0], [1, 0, 0], [0, 1, 0])).toBeCloseTo(1);
+  });
+});
+
+describe('component switches (the Sunburst rally arms)', () => {
+  it('writes the value the game takes when the mod declares no components', () => {
+    const parts = { car_susp_F: { slotType: 'car_susp_F', nodes: [['id', 'posX', 'posY', 'posZ'], { nodeWeight: '$= $components.chassisStiffening == true and 3.0 or 2.0' }, ['f1', 0.5, -1.3, 0.3]] } };
+    const t = transplantSuspension({ parts, root: 'car_susp_F', anchors: {}, offset: [0, 0, 0], partPrefix: 'mod_F_', nodePrefix: 'f_', target: [], meshNames: {}, tuning: {} });
+    expect(JSON.stringify(t.parts.mod_F_car_susp_F!.nodes)).toContain('"nodeWeight":2');
+    expect(bakeComponents('$= $foo + 1')).toBe('$= $foo + 1');
   });
 });
