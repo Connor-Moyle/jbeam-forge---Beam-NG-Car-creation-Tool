@@ -431,11 +431,11 @@ export function attachToParent(child: readonly StructNode[], parent: readonly St
   const d = (a: StructNode, b: StructNode) => Math.hypot(a.pos[0] - b.pos[0], a.pos[1] - b.pos[1], a.pos[2] - b.pos[2]);
   const nearestDist = child.map((c) => Math.min(...parent.map((p) => d(c, p))));
   const sorted = [...nearestDist].sort((x, y) => x - y);
-  // Nodes within reach of the parent (≤ 0.15 m, or 1.5× the closest gap when the part sits slightly off),
+  // Nodes within reach of the parent (≤ 0.22 m, as the game attaches most of a panel's nodes; or 1.5× the closest gap when the part sits slightly off),
   // at least 3. A part far from its parent (> FAR_FROM_PARENT) only hangs on its 3 nearest nodes.
   const gap = sorted[0] ?? 0;
   const far = gap > FAR_FROM_PARENT;
-  const reach = far ? -1 : Math.max(0.15, gap * 1.5);
+  const reach = far ? -1 : Math.max(0.22, gap * 1.5);
   const chosen = new Set<number>();
   child.forEach((_, i) => {
     if (nearestDist[i]! <= reach) chosen.add(i);

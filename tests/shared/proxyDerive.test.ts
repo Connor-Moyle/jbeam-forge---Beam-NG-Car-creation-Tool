@@ -86,7 +86,7 @@ describe('derivation', () => {
     const child = [node('c1', 0, 0, 0.05), node('c2', 1, 0, 0.05), node('c3', 0, 1, 0.05), node('c4', 0, 0, 3)];
     const beams = attachToParent(child, parent, 'clipped', 'child');
     expect(new Set(beams.map((b) => b.id1))).toEqual(new Set(['c1', 'c2', 'c3'])); // the far node isn't attached
-    expect(beams.filter((b) => b.id1 === 'c1')).toHaveLength(2); // clipped = 2 links
+    expect(beams.filter((b) => b.id1 === 'c1')).toHaveLength(3); // clipped = 3 links, as the game's panels hang
     expect(beams.every((b) => b.kind === 'attach' && b.partId === 'child')).toBe(true);
     // Far from the parent: only the 3 nearest child nodes attach.
     const far = child.map((c) => ({ ...c, pos: [c.pos[0], c.pos[1], c.pos[2] + 3] as [number, number, number] }));

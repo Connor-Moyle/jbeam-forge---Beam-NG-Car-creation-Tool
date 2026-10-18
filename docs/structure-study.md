@@ -43,3 +43,24 @@ The old presets came from one car. Over all 38:
 - **Glass** damping is 25 across the game (the Sunburst's 250 was the outlier); strength 6k with deform 4k.
 - **Engine blocks** are 6M spring (not 15M); suspension arms deform at 60k (not 25k).
 - **Panel node counts**: hood 13 (up to 27), boot 10 (up to 20), wing 10 (up to 20), roof 10 (up to 22); doors stay at 15–16.
+
+## Layout: how many nodes, and how a part hangs on
+
+The same script run with `--mod <exported mod folder>` measures our output the same way, so the gap is a table. Each part's size is the area of its outline seen flat on (`src/shared/proxy/layout.ts`), so counts compare as nodes per square metre. Attachments are a part's beams that reach another part's nodes.
+
+| kind | game nodes/m² | ours before | ours now | game attach/part · per node · share of nodes | ours before | ours now |
+|---|---:|---:|---:|---|---|---|
+| bumper | 25 | 47 | 29 | 30 · 3.2 · 71% | 14 · 2.0 · 32% | 30 · 3.0 · 77% |
+| fender | 22 | 17 | 20 | 27 · 3.4 · 92% | 18 · 3.0 · 55% | 30 · 3.0 · 77% |
+| hood | 16 | 13 | 14 | 17 · 3.0 · 67% | 33 · 3.0 · 58% | 45 · 3.0 · 75% |
+| trunk | 22 | 20 | 20 | 16 · 3.8 · 67% | 24 · 3.0 · 62% | 30 · 3.0 · 77% |
+| spoiler | 35 | 24 | 33 | 30 · 4.0 · 100% | 12 · 2.0 · 55% | 45 · 3.0 · 100% |
+| grille | 30 | 42 | 36 | 22 · 3.9 · 86% | 16 · 2.0 · 57% | 30 · 3.0 · 83% |
+| door | 16 | 14 | 18 | 13 · 4.3 · 27% (hinged) | 30 · 3.0 · 59% | 54 · 3.0 · 82% (bolted in this test) |
+| side skirt | 39 | 55 | 57 | 32 · 4.3 · 88% | 16 · 2.0 · 29% | 54 · 3.0 · 62% |
+
+What the generator does with it (0.17.2):
+
+- **Node count from area.** A hull-built panel or trim part gets `area × the game's density` nodes at the middle of the Detail slider (0.6× to 1.4× across it), within its kind's budget. The body shell keeps its surface budget: with the density rule its node count dropped and a door's hinge mounts landed on other body nodes, so the hinge sandbox's door no longer opened.
+- **Attachments like the game's.** Clipped parts hang on 3 beams per attached node (was 2), and a part attaches every node within 0.22 m of its parent (was 0.15 m), which takes the attached share of bumpers, fenders and grilles from a third to three quarters, as the game has them.
+- **Left alone.** Side skirts stay denser than the game's: a long thin part is given extra nodes until the game can hang its mesh on it (the "bindable" rule), which outweighs the density. Their nodes are light (0.22 kg against the game's 0.4), which is why the plastic preset keeps its damping.

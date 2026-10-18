@@ -48,7 +48,7 @@ export type AttachmentStyle = (typeof ATTACHMENT_STYLES)[number];
 
 export const ATTACHMENT_VALUES: Record<AttachmentStyle, BeamValues & { label: string; links: number; breakGroup: boolean }> = {
   bolted: { label: 'Bolted', links: 3, beamSpring: 400_000, beamDamp: 40, beamDeform: 12_000, beamStrength: 65_000, breakGroup: true },
-  clipped: { label: 'Clipped', links: 2, beamSpring: 150_000, beamDamp: 20, beamDeform: 4_000, beamStrength: 8_000, breakGroup: true },
+  clipped: { label: 'Clipped', links: 3, beamSpring: 150_000, beamDamp: 20, beamDeform: 4_000, beamStrength: 8_000, breakGroup: true },
   rivets: { label: 'Rivets', links: 3, beamSpring: 600_000, beamDamp: 50, beamDeform: 15_000, beamStrength: 40_000, breakGroup: true },
   welded: { label: 'Welded', links: 4, beamSpring: 1_000_000, beamDamp: 60, beamDeform: 20_000, beamStrength: 150_000, breakGroup: false },
 };
@@ -73,7 +73,25 @@ export interface KindDefaults {
   budget: [number, number];
   bracing: BracingDensity;
   attachment: AttachmentStyle;
+  /**
+   * Nodes per square metre of the part's outline, as the game's cars have (docs/structure-study.md):
+   * the node count is the part's area times this, within the budget. Unset: the budget's middle.
+   */
+  nodesPerM2?: number;
 }
+
+/**
+ * Nodes per square metre of outline, median over the game's 38 cars by part kind (the study's
+ * `nodes/m²` column). A door at 0.85 m² gets 14 nodes like the game's; a bumper at 0.7 m² gets 18,
+ * not the 22 a flat budget gave it.
+ */
+const NODE_DENSITY: Record<string, number> = {
+  door: 16, sliding_door: 16, hood: 16, trunk: 22, tailgate: 22, fender: 22, quarter_panel: 22, roof: 14,
+  bumper: 25, bumper_reinforcement: 25, side_skirt: 39, spoiler: 35, wing: 35, splitter: 35, diffuser: 35, grille: 30,
+  headlight: 121, taillight: 121, foglight: 121, mirror: 196, seat: 14, rear_seat: 14, dashboard: 27,
+  exhaust: 17, muffler: 17, exhaust_manifold: 17, radiator: 20, intercooler: 20, fuel_tank: 37, intake: 28,
+  windshield: 26, rear_glass: 26, door_glass: 26, quarter_glass: 26, subframe: 20,
+};
 
 const RIDERS = new Set(['badge', 'sunstrip', 'gauges', 'radio', 'plate_light', 'brake_light', 'indicator', 'underglow', 'license_plate', 'door_handle', 'window_switch', 'interior_mirror', 'seatbelt', 'headliner', 'carpet', 'parcel_shelf', 'trunk_trim', 'interior_trim', 'trim', 'pedals', 'police_lights', 'wiper', 'rear_wiper', 'antenna', 'engine_cover']);
 const SUSPENSION_SUBCATEGORIES = new Set(['Suspension', 'Steering', 'Wheels', 'Brakes']);
@@ -94,7 +112,8 @@ const PANEL_BUDGETS: Record<string, [number, number]> = { door: [10, 20], hood: 
 /** Proxy mode, budget, bracing and attachment defaults for a part kind (user-overridable per part). */
 export function kindDefaults(entry: TaxonomyEntry): KindDefaults {
   const attachment: AttachmentStyle = entry.beamPreset === 'glass_brittle' ? 'clipped' : entry.subcategory === 'Structure' || entry.category === 'Mechanical' ? 'bolted' : entry.beamPreset === 'panel_plastic' || entry.beamPreset === 'panel_bumper' || entry.beamPreset === 'trim_light' ? 'clipped' : 'bolted';
-  const base = { bracing: 'standard' as BracingDensity, attachment, role: 'own' as StructureRole };
+  const density = NODE_DENSITY[entry.id];
+  const base = { bracing: 'standard' as BracingDensity, attachment, role: 'own' as StructureRole, ...(density ? { nodesPerM2: density } : {}) };
   if (entry.beamPreset === 'tyre_rubber' || SUSPENSION_SUBCATEGORIES.has(entry.subcategory) || SUSPENSION_IDS.has(entry.id) || GAME_SET_IDS.has(entry.id)) return { ...base, role: 'suspension', mode: 'cylinder', budget: [4, 8] };
   if (RIDERS.has(entry.id)) return { ...base, role: 'rides', mode: 'decimate', budget: [4, 8], bracing: 'none' };
   // The shell follows its surface: a hull would bridge the wheel arches, with collision faces through the tyres.
@@ -114,8 +133,13 @@ export function kindDefaults(entry: TaxonomyEntry): KindDefaults {
   return { ...base, mode: 'hull', budget: [8, 16] };
 }
 
-/** Detail 0..1 → vertex target within the budget. */
-export function targetVertices(budget: readonly [number, number], detail: number): number {
+/**
+ * Detail 0..1 → vertex target within the budget. With the part's area and the kind's density, the
+ * target is what the game's cars would give a part that size (detail 0.5), from 0.6 to 1.4 times
+ * that across the slider, kept within the budget.
+ */
+export function targetVertices(budget: readonly [number, number], detail: number, areaM2?: number, nodesPerM2?: number): number {
   const d = Math.min(1, Math.max(0, detail));
+  if (areaM2 && nodesPerM2) return Math.round(Math.min(budget[1], Math.max(budget[0], areaM2 * nodesPerM2 * (0.6 + 0.8 * d))));
   return Math.round(budget[0] + (budget[1] - budget[0]) * d);
 }

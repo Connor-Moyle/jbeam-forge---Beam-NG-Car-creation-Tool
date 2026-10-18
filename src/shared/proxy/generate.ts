@@ -1,4 +1,5 @@
 import type { Part, PartProxy, Project, StructNode } from '../project/schema';
+import { projectedArea } from './layout';
 import type { TaxonomyEntry } from '../taxonomy/schema';
 import { materialDefaults } from '../parts/materials';
 import { bindable, buildProxy } from './build';
@@ -227,7 +228,7 @@ export function generateStructure(doc: Doc, tax: TaxonomyLookup, geometries: rea
     }
     const massKg = partMass(part, entry, settings);
     const cap = massNodeCap(entry, massKg);
-    const target = Math.min(targetVertices(defaults.budget, settings.detail), cap);
+    const target = Math.min(targetVertices(defaults.budget, settings.detail, projectedArea(mesh.positions), defaults.nodesPerM2), cap);
     const build = (vertices: number) => buildProxy(mesh, { mode: settings.mode, targetVertices: vertices, symmetry: settings.symmetry, maxEdge: settings.maxEdge, minEdge: settings.minEdge, inset: settings.inset, maxVertices: Math.max(cap, vertices) });
     let built = build(target);
     // A long thin part can come out as a row of single nodes, which the game can't hang a mesh on:
