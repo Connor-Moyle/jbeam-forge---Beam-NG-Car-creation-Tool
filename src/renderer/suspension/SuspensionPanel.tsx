@@ -130,7 +130,7 @@ function AxleCard({ axle }: { axle: Axle }) {
                 Use the game&rsquo;s meshes
               </Button>
             ) : (
-              <Button size="sm" onClick={() => showOwnMeshes(axle.id, selection)} disabled={!selection.length} data-testid="axle-own-meshes">
+              <Button size="sm" onClick={() => showOwnMeshes(axle.id, selection)} title={selection.length ? undefined : 'Select your suspension meshes in the viewport first'} data-testid="axle-own-meshes">
                 Use my selected meshes
               </Button>
             )}

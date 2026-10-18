@@ -259,6 +259,21 @@ describe('jbeam export', () => {
     expect(groupsOf(rearRim.name)).not.toEqual(['wheel_RL']); // no suspension on that axle: unchanged
   });
 
+  it('stretches a fitted suspension sideways when the axle’s track differs from the set’s own', () => {
+    const { doc, meshes } = carProject();
+    createPart(doc, tax, { taxonomyId: 'suspension_set', id: 'p_front_set' });
+    const hub = { slotType: 'car_suspension_F', nodes: [['id', 'posX', 'posY', 'posZ'], ['fh1l', 0.7, -1.3, 0.3]] };
+    const hubX = (track: number) => {
+      doc.axles = [{ id: 'a1', name: 'Front', y: -1.3, track, steered: true, tuning: {}, ownMeshes: [], fitted: { setId: 'car/front', name: 'Strut', vehicle: 'Car', type: 'strut', sourceId: 'susp', track: 1.5 } }];
+      doc.sources = [{ id: 'susp', placement: { position: [0, 0, 0], rotation: [0, 0, 0], scale: 1 } } as never];
+      const files = buildJbeamFiles(doc, tax, { meshNames: exportMeshNames(doc, meshes), author: 'x', suspensions: { 'car/front': { root: 'car_suspension_F', anchors: {}, parts: { car_suspension_F: hub } } } });
+      const set = files.find((f) => f.part.endsWith('_F_car_suspension_F'))!;
+      return readTable(parsePart(set.text)[1].nodes!).records[0]!.values.posX;
+    };
+    expect(hubX(1.5)).toBe(0.7);
+    expect(hubX(1.65)).toBeCloseTo(0.77);
+  });
+
   it('bolts a game suspension to the body, never to the hood or a door next to it', () => {
     const { doc, meshes } = carProject();
     const body = bodyPart(doc, tax)!;

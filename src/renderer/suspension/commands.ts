@@ -17,7 +17,7 @@ import { defaultSettings, stageImport } from '@renderer/import/pipeline';
 import { cornerTargets } from '@renderer/objects/placeObject';
 import { assignToNewPart } from '@renderer/parts/commands';
 import { IDENTITY_EDIT } from '@shared/mesh/meshEdit';
-import { setWheels } from '@shared/suspension/wheels';
+import { setTrack, setWheels } from '@shared/suspension/wheels';
 
 /**
  * Suspension workshop (Phase 10): the car's axles, and complete suspensions
@@ -178,6 +178,7 @@ async function fitSuspensionSteps(axleId: string, set: SuspensionSet): Promise<v
   // line: the same for every set, whatever its meshes are called and however far its springs,
   // arms or driveshaft reach. Only a set with no wheels of its own is placed by its meshes.
   const wheels = setWheels(useSetData.getState().data[set.id]?.parts ?? {});
+  const native = setTrack(useSetData.getState().data[set.id]?.parts ?? {});
   let at: number[];
   if (wheels.length) {
     const mean = (i: number) => wheels.reduce((s, w) => s + w.centre[i]!, 0) / wheels.length;
@@ -203,18 +204,20 @@ async function fitSuspensionSteps(axleId: string, set: SuspensionSet): Promise<v
       if (old) removeSourceFromDoc(d, old);
       const a = d.axles.find((x) => x.id === axleId);
       if (a) {
-        a.fitted = { setId: set.id, name: set.name, vehicle: set.vehicleName, type: set.type, sourceId };
+        a.fitted = { setId: set.id, name: set.name, vehicle: set.vehicleName, type: set.type, sourceId, ...(native ? { track: native } : {}) };
+        // The set's own width is the axle's track until the user changes it.
+        if (native) a.track = native;
         a.tuning = {};
       }
     },
   });
   const moved = followSetWheels(axleId);
   startPlacing(sourceId, 'suspension');
-  const setTrack = all.max.x - all.min.x;
+  const width = native ?? all.max.x - all.min.x;
   useUiStore
     .getState()
     .pushStatus(
-      `Fitted the ${set.vehicleName} ${set.name} (${set.type}) to the ${axle.name.toLowerCase()}. It's ${(setTrack * 1000).toFixed(0)} mm wide against your ${(axle.track * 1000).toFixed(0)} mm track.${moved ? ` Your ${moved === 1 ? 'wheel and its brakes' : 'wheels and brakes'} moved onto its hubs.` : ''} The arrows are on it: drag to fine-tune (its physics and the wheels move with it).`,
+      `Fitted the ${set.vehicleName} ${set.name} (${set.type}) to the ${axle.name.toLowerCase()}. Its track is ${(width * 1000).toFixed(0)} mm (change Track on the axle to widen or narrow it on export).${moved ? ` Your ${moved === 1 ? 'wheel and its brakes' : 'wheels and brakes'} moved onto its hubs.` : ''} The arrows are on it: drag to fine-tune (its physics and the wheels move with it).`,
       'success',
       10000,
     );

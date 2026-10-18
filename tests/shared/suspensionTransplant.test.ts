@@ -41,6 +41,17 @@ describe('suspension jbeam transplant', () => {
     expect([...definedNodes(PARTS.car_suspension_F!).keys()]).toEqual(['fh1r', 'fh1l']);
   });
 
+  it('stretches the set sideways about its centre line when the track changes', () => {
+    const r = transplantSuspension({ parts: PARTS, root: 'car_suspension_F', anchors: {}, offset: [0.1, 0, 0], partPrefix: 'm_F_', nodePrefix: 'f_', target: [], meshNames: {}, tuning: {}, lateral: 1.1 });
+    const s = r.parts.m_F_car_suspension_F!;
+    const rows = (s.nodes as unknown[][]).filter((n) => typeof n[0] === 'string' && n[0].startsWith('f_'));
+    expect(rows.map((n) => n[1])).toEqual([expect.closeTo(-0.67), expect.closeTo(0.87)]);
+    // Wheel slot offset (a variable plus a number) is stretched as a formula; y and z only move with the set.
+    const slot = (s.slots2 as unknown[][]).find((row) => row[0] === 'wheel_F_5')!.at(-1) as { nodeOffset: { x: string; y: number } };
+    expect(slot.nodeOffset.x).toBe('$=(($trackoffset_F + 0.26) * 1.1) + 0.1');
+    expect(slot.nodeOffset.y).toBe(-1.3);
+  });
+
   it('renames, moves, re-attaches and re-points everything', () => {
     const anchors = externalNodeRefs(PARTS, new Map(BODY));
     const r = transplantSuspension({

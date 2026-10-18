@@ -168,6 +168,14 @@ export function setWheels(parts: Record<string, JbeamObject>, offset: V3 = [0, 0
   return [...found.values()];
 }
 
+/** Wheel centre to wheel centre of a set as the game built it (null: no wheels). One side only counts twice its distance from the centre line. */
+export function setTrack(parts: Record<string, JbeamObject>): number | null {
+  const xs = setWheels(parts).map((w) => w.centre[0]);
+  if (!xs.length) return null;
+  const t = xs.length > 1 ? Math.max(...xs) - Math.min(...xs) : 2 * Math.abs(xs[0]!);
+  return t > 0.3 ? t : null;
+}
+
 /**
  * The wheels a set brings, by name (FL, FR, RL…): more than two and the set is the whole running
  * gear (a box trailer's or a utility frame's), covering both axles.

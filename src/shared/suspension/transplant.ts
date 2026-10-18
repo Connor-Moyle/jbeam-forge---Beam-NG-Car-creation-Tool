@@ -158,6 +158,8 @@ export interface TransplantInput {
   fallbackGroup?: string;
   /** The set's own nodes its car's body also held (the Autobello's fx0): bolted to the new body. */
   held?: readonly string[];
+  /** Sideways stretch of the set about its centre line (new track ÷ its own): hubs, arms and wheel slots move out or in. 1 or unset: as the game made it. */
+  lateral?: number;
 }
 
 /** Node groups a set makes: groups in its nodes tables, and the wheel groups its wheels create at spawn. */
@@ -300,8 +302,17 @@ export function shiftOffset(v: JbeamValue, d: number): JbeamValue {
   return v;
 }
 
+/** A sideways coordinate stretched by `k` about the centre line; formulas and variables keep working ("$=(…) * k"). */
+export function stretchX(v: JbeamValue, k: number): JbeamValue {
+  if (Math.abs(k - 1) < 1e-9) return v;
+  if (typeof v === 'number') return Math.round(v * k * 1e6) / 1e6;
+  if (typeof v === 'string' && v.startsWith('$=')) return `$=(${v.slice(2)}) * ${k}`;
+  if (typeof v === 'string' && v.startsWith('$')) return `$=${v} * ${k}`;
+  return v;
+}
+
 /** Slot rows' nodeOffset {x, y, z} (where child parts such as wheels sit) moved with the suspension. */
-function shiftSlotOffsets(table: JbeamValue, offset: V3): JbeamValue {
+function shiftSlotOffsets(table: JbeamValue, offset: V3, lateral = 1): JbeamValue {
   if (!Array.isArray(table)) return table;
   return table.map((row, i) => {
     if (i === 0 || !Array.isArray(row)) return row;
@@ -310,7 +321,7 @@ function shiftSlotOffsets(table: JbeamValue, offset: V3): JbeamValue {
       const o = cell.nodeOffset;
       const moved: JbeamObject = { ...o };
       (['x', 'y', 'z'] as const).forEach((axis, k) => {
-        if (o[axis] !== undefined) moved[axis] = shiftOffset(o[axis], offset[k]!);
+        if (o[axis] !== undefined) moved[axis] = shiftOffset(axis === 'x' ? stretchX(o[axis], lateral) : o[axis], offset[k]!);
       });
       return { ...cell, nodeOffset: moved };
     });
@@ -332,6 +343,7 @@ function renameStrings(value: JbeamValue, map: ReadonlyMap<string, string>): Jbe
 const HUB_NODE = /^[fr]w1(?:l{1,2}|r{1,2})$/i;
 
 export function transplantSuspension(input: TransplantInput): TransplantResult {
+  const lateral = input.lateral && input.lateral > 0 ? input.lateral : 1;
   const warnings: string[] = [];
   const partNames = new Map(Object.keys(input.parts).map((n) => [n, `${input.partPrefix}${n}`]));
   const slotTypes = new Map<string, string>();
@@ -377,7 +389,7 @@ export function transplantSuspension(input: TransplantInput): TransplantResult {
     }
   }
   const setPositions = new Map<string, V3>();
-  for (const body of Object.values(input.parts)) for (const [id, pos] of definedNodes(body)) if (!setPositions.has(id)) setPositions.set(id, pos);
+  for (const body of Object.values(input.parts)) for (const [id, pos] of definedNodes(body)) if (!setPositions.has(id)) setPositions.set(id, [pos[0] * lateral, pos[1], pos[2]]);
   const keepGroup = (g: JbeamValue): JbeamValue => (typeof g === 'string' && input.fallbackGroup && !groups.has(g) ? input.fallbackGroup : g);
 
   // How much spring the set's beams put on each node it doesn't define: hydros and torsion bars too
@@ -572,13 +584,13 @@ export function transplantSuspension(input: TransplantInput): TransplantResult {
       if (section === 'information') part[section] = value;
       // A part that fits several slots (one intake for three engines) keeps fitting each of them.
       else if (section === 'slotType') part[section] = typeof value === 'string' ? (slotTypes.get(value) ?? value) : Array.isArray(value) ? value.map((v) => (typeof v === 'string' ? (slotTypes.get(v) ?? v) : v)) : value;
-      else if (section === 'slots' || section === 'slots2') part[section] = shiftSlotOffsets(renameStrings(rewriteSlots(value, input.slotRewrites ?? {}), names), input.offset);
+      else if (section === 'slots' || section === 'slots2') part[section] = shiftSlotOffsets(renameStrings(rewriteSlots(value, input.slotRewrites ?? {}), names), input.offset, lateral);
       else if (section === 'nodes' && Array.isArray(value)) {
         part[section] = value.map((row, i) => {
           if (i === 0 || !Array.isArray(row) || typeof row[0] !== 'string') return row;
           const [id, x, y, z, ...rest] = row;
           // Formula positions move too ("$=… + d"), or those nodes stayed where the original car had them.
-          const moved = typeof x === 'number' && typeof y === 'number' && typeof z === 'number' ? add([x, y, z], input.offset) : [shiftOffset(x!, input.offset[0]), shiftOffset(y!, input.offset[1]), shiftOffset(z!, input.offset[2])];
+          const moved = typeof x === 'number' && typeof y === 'number' && typeof z === 'number' ? add([x * lateral, y, z], input.offset) : [shiftOffset(stretchX(x!, lateral), input.offset[0]), shiftOffset(y!, input.offset[1]), shiftOffset(z!, input.offset[2])];
           return [nodeIds.get(id) ?? id, ...moved, ...rest] as JbeamValue[];
         });
       } else if (section === 'flexbodies' && Array.isArray(value)) {

@@ -192,6 +192,12 @@ export const MIGRATIONS: readonly Migration[] = [
     describe: 'the final drive and kind of a differential added to a driven axle',
     migrate: (doc) => ({ ...doc, formatVersion: 25 }),
   },
+  {
+    from: 25,
+    // Nothing to change: a fitted suspension's own track is new and optional (without it, the axle's track doesn't stretch the set).
+    describe: 'the track of a fitted suspension, so the axle’s track can widen or narrow it',
+    migrate: (doc) => ({ ...doc, formatVersion: 26 }),
+  },
 ];
 
 export class MigrationError extends Error {

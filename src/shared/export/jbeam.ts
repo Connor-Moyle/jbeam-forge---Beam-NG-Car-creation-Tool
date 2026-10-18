@@ -487,7 +487,7 @@ export function buildJbeamFiles(fullDoc: Doc, tax: TaxonomyLookup, opts: JbeamEx
     const b = bodyPart(doc, tax);
     return b ? (flexGroupOf(doc, b) ?? undefined) : undefined;
   })();
-  const bring = (setId: string, sourceId: string, tag: string, target: readonly { id: string; pos: [number, number, number] }[], tuning: Record<string, number>, slotRewrites?: Record<string, { slotType: string; part: string }>, edits?: PowertrainEdits, choices?: SetChoices, driveline?: PowertrainEdits, linkedNodes?: Record<string, string>) => {
+  const bring = (setId: string, sourceId: string, tag: string, target: readonly { id: string; pos: [number, number, number] }[], tuning: Record<string, number>, slotRewrites?: Record<string, { slotType: string; part: string }>, edits?: PowertrainEdits, choices?: SetChoices, driveline?: PowertrainEdits, linkedNodes?: Record<string, string>, lateral?: number) => {
     const found = opts.suspensions?.[setId];
     if (!found) return null;
     // The game's other parts the user chose, then the engine and gearbox builders' changes, onto the game's parts before they're renamed.
@@ -498,7 +498,7 @@ export function buildJbeamFiles(fullDoc: Doc, tax: TaxonomyLookup, opts: JbeamEx
     for (const [key, name] of opts.meshNames) if (key.startsWith(`${sourceId}:`) && !key.includes('/')) meshNames[key.slice(sourceId.length + 1)] = name;
     const offset = fullDoc.sources?.find((s) => s.id === sourceId)?.placement.position ?? [0, 0, 0];
     // Every engine shares the e_ node names (only one is fitted at a time), so the gearbox fits whichever is chosen.
-    const t = transplantSuspension({ parts: data.parts, root: data.root, anchors: data.anchors, offset, partPrefix: `${slug}_${tag}_`, nodePrefix: `${tag.startsWith('E') ? 'e' : tag.toLowerCase()}_`, target, meshNames, tuning, slotRewrites, linkedNodes, fallbackGroup: bodyGroup, held: found.held });
+    const t = transplantSuspension({ parts: data.parts, root: data.root, anchors: data.anchors, offset, partPrefix: `${slug}_${tag}_`, nodePrefix: `${tag.startsWith('E') ? 'e' : tag.toLowerCase()}_`, target, meshNames, tuning, slotRewrites, linkedNodes, fallbackGroup: bodyGroup, held: found.held, lateral });
     for (const [name, content] of Object.entries(t.parts)) files.push({ file: `${name}.jbeam`, part: name, text: serializeJbeam({ [name]: content }) });
     foreign.push(...Object.values(t.parts));
     return t;
@@ -516,7 +516,7 @@ export function buildJbeamFiles(fullDoc: Doc, tax: TaxonomyLookup, opts: JbeamEx
   }
   (fullDoc.axles ?? []).forEach((axle, i) => {
     if (!axle.fitted) return;
-    const t = bring(axle.fitted.setId, axle.fitted.sourceId, axleTag(i), mountNodes, axle.tuning, undefined, undefined, axle.fitted.choices, axle.edits, blockOfEngine);
+    const t = bring(axle.fitted.setId, axle.fitted.sourceId, axleTag(i), mountNodes, axle.tuning, undefined, undefined, axle.fitted.choices, axle.edits, blockOfEngine, axle.fitted.track ? axle.track / axle.fitted.track : undefined);
     if (!t) return;
     axleSets.push({ index: i, t });
     extraSlots.push([t.rootSlotType, [t.rootSlotType], [], t.rootPart, `${axle.name} suspension`]);

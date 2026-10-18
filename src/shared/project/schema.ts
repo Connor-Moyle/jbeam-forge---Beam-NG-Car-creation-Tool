@@ -22,7 +22,7 @@ import { EngineDesignSchema } from '../powertrain/design';
  * may tighten the type without a migration; anything else needs one.
  */
 export const PROJECT_FORMAT = 'jbforge';
-export const CURRENT_PROJECT_VERSION = 25;
+export const CURRENT_PROJECT_VERSION = 26;
 
 export const SLUG_PATTERN = /^[a-z0-9]+(?:_[a-z0-9]+)*$/;
 
@@ -395,6 +395,8 @@ export const AxleSchema = z.object({
       vehicle: z.string(),
       type: z.string(),
       sourceId: z.string(),
+      /** Wheel centre to wheel centre of the set as the game built it, metres. The axle's track against this stretches the set sideways on export. */
+      track: z.number().positive().optional(),
       /** The game's other parts for its slots (fork): default per slot and which ship as choices. */
       choices: SetChoicesSchema.optional(),
     })
@@ -701,7 +703,12 @@ export const ProjectV25Schema = ProjectV24Schema.extend({
   formatVersion: z.literal(25),
 });
 
-export const ProjectSchema = ProjectV25Schema;
+/** v26: a fitted suspension's own track (axle.fitted.track), so the axle's track can widen or narrow it on export. */
+export const ProjectV26Schema = ProjectV25Schema.extend({
+  formatVersion: z.literal(26),
+});
+
+export const ProjectSchema = ProjectV26Schema;
 export type Project = z.infer<typeof ProjectSchema>;
 export type PartVersion = z.infer<typeof PartVersionSchema>;
 export type ProjectMeta = z.infer<typeof ProjectMetaSchema>;
