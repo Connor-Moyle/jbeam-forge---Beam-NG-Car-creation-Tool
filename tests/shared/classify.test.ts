@@ -95,6 +95,23 @@ describe('Classifier', () => {
     expect(c.confidence).toBe(1);
   });
 
+  it('reads UK English and everyday names', () => {
+    const kind = (n: string) => classifier.classify(n).taxonomyId;
+    expect(kind('Wing_L')).toBe('fender');
+    expect(kind('Front_Wing_Right')).toBe('fender');
+    expect(kind('Rear_Wing_L')).toBe('quarter_panel');
+    expect(kind('Rear_Wing')).toBe('wing');
+    expect(kind('GT_Wing')).toBe('wing');
+    expect(kind('Boot_Lid')).toBe('trunk');
+    expect(kind('Tail_Lamp_L')).toBe('taillight');
+    expect(kind('Rear_Screen')).toBe('rear_window');
+    expect(kind('Seat_Driver')).toBe('seat');
+    expect(kind('Tailpipe')).toBe('exhaust');
+    expect(kind('Petrol_Flap')).toBe('fuel_door');
+    expect(kind('Accelerator')).toBe('pedals');
+    expect(classifier.classify('Pedal_Brake').confidence).toBeGreaterThanOrEqual(0.9);
+  });
+
   it('leaves names it cannot explain unassigned', () => {
     expect(classifier.classify('qwerty_zxcv').taxonomyId).toBeNull();
     expect(classifier.classify('').taxonomyId).toBeNull();

@@ -39,6 +39,7 @@ const POSITIONAL: Record<string, { front: string; rear: string; corner?: string 
   window: { front: 'windshield', rear: 'rear_window', corner: 'door_glass' },
   windows: { front: 'windshield', rear: 'rear_window', corner: 'door_glass' },
   glass: { front: 'windshield', rear: 'rear_window', corner: 'door_glass' },
+  screen: { front: 'windshield', rear: 'rear_window' },
 };
 /** Grouping words that say where a part lives, not what it is. */
 const CONTEXT_WORDS = new Set(['interior', 'exterior', 'body', 'extra']);
@@ -122,6 +123,8 @@ export class Classifier {
       if (better) best = { id: e.id, score, head: hasHead, phraseLen: longest };
     }
     if (!best || best.score < MINIMUM) return this.byPosition(tokens) ?? { ...empty, confidence: best?.score ?? 0 };
+    // UK English: a wing with a side is a front wing (fender), or at the rear a quarter panel; an aero wing has no side.
+    if (best.id === 'wing' && (tokens.side || tokens.corner)) best.id = tokens.fore === 'R' || tokens.corner?.startsWith('R') ? 'quarter_panel' : 'fender';
     const entry = this.byId.get(best.id)!;
     return { taxonomyId: best.id, position: resolvePosition(entry.positionAxis, tokens), variant: variantKey(tokens), confidence: Math.min(1, best.score), tokens };
   }

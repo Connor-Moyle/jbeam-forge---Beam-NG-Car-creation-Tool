@@ -294,6 +294,8 @@
       "openable": true,
       "nameHints": [
         "boot",
+        "boot lid",
+        "bootlid",
         "decklid",
         "deck lid",
         "trunklid"
@@ -334,7 +336,9 @@
       "nameHints": [
         "door shell",
         "door sheet",
-        "door skin"
+        "door skin",
+        "driver door",
+        "passenger door"
       ]
     },
     {
@@ -448,6 +452,9 @@
         "fuel flap",
         "fuel door",
         "gas cap",
+        "fuel cap",
+        "petrol flap",
+        "petrol cap",
         "filler",
         "fuel lid"
       ]
@@ -814,6 +821,8 @@
       "nameHints": [
         "tail light",
         "taillamp",
+        "tail lamp",
+        "rear lamp",
         "rear light",
         "taillightglass",
         "brakelight",
@@ -1015,6 +1024,8 @@
       "nameHints": [
         "rearglass",
         "rear glass",
+        "rear screen",
+        "back screen",
         "backlight",
         "back glass"
       ]
@@ -1428,7 +1439,9 @@
         "head unit",
         "stereo",
         "nav",
-        "screen"
+        "infotainment",
+        "touchscreen",
+        "touch screen"
       ]
     },
     {
@@ -1529,7 +1542,12 @@
         "brakepedal",
         "gaspedal",
         "clutchpedal",
-        "pedal box"
+        "pedal box",
+        "accelerator",
+        "brake pedals",
+        "gas pedals",
+        "throttle pedals",
+        "clutch pedals"
       ]
     },
     {
@@ -1548,6 +1566,8 @@
       "nameHints": [
         "seats",
         "bucket seat",
+        "driver seat",
+        "passenger seat",
         "bench"
       ]
     },
@@ -1907,6 +1927,9 @@
       "nameHints": [
         "downpipe",
         "midpipe",
+        "tailpipe",
+        "tail pipe",
+        "silencer",
         "catalytic",
         "resonator"
       ]
