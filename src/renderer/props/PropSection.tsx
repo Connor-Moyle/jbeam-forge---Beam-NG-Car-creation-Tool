@@ -8,6 +8,7 @@ import { useEditStore } from '@renderer/structure/editStore';
 import { Button } from '@renderer/ui/components/Button';
 import { CollapsibleSection } from '@renderer/ui/components/CollapsibleSection';
 import { Field } from '@renderer/ui/components/Field';
+import { IconButton } from '@renderer/ui/components/IconButton';
 import { Input } from '@renderer/ui/components/Input';
 import { NumberInput } from '@renderer/ui/components/NumberInput';
 import { Select } from '@renderer/ui/components/Select';
@@ -47,7 +48,7 @@ export function PropSection({ meshKey }: { meshKey: string }) {
   const range = Math.max(Math.abs(prop.min), Math.abs(prop.max)) / Math.max(1e-9, Math.abs(prop.multiplier));
   const amount = propAmount(prop, value);
   return (
-    <CollapsibleSection id="mesh-prop" title={`Animation: ${kind?.label ?? prop.func}`} defaultOpen>
+    <CollapsibleSection id="mesh-prop" title={`Animation: ${kind?.label ?? prop.func}`} defaultOpen actions={<IconButton size="sm" icon={Trash2} label="Stop animating" onClick={() => removeProp(prop.id)} data-testid="prop-remove" />}>
       <Field label="Driven by" hint="The game's electrics value: steering, rpmTacho, wheelspeed (m/s), fuel, watertemp, throttle, brake, clutch, parkingbrake…">
         <Input value={prop.func} onChange={(e) => e.target.value.trim() && updateProp(prop.id, { func: e.target.value.trim() })} mono aria-label="Electrics value" />
       </Field>
@@ -94,10 +95,7 @@ export function PropSection({ meshKey }: { meshKey: string }) {
           <NumberInput value={prop.max} onChange={(max) => updateProp(prop.id, { max })} step={1} precision={1} unit={slides ? 'm' : '°'} aria-label="Maximum" />
         </Field>
       </div>
-      <p className={styles.note}>Exported as the part&rsquo;s props: the game turns it by value × multiplier + offset, kept between least and most. It rides on its part&rsquo;s nodes instead of bending with them.</p>
-      <Button size="sm" icon={Trash2} variant="ghost" onClick={() => removeProp(prop.id)}>
-        Stop animating
-      </Button>
+      <p className={styles.note}>Exported as the part&rsquo;s props: the game turns it by value × multiplier + offset, kept between least and most. It rides on its part&rsquo;s nodes instead of bending with them. The bin above stops animating it.</p>
     </CollapsibleSection>
   );
 }

@@ -1910,6 +1910,20 @@ const scenarios = [
       await page.getByTestId('moving-parts').getByText('Animate as steering wheel').click();
       doc = await hook(page, 'projectDoc');
       assert((doc.props ?? []).some((p) => p.func === 'steering'), 'steering wheel animated');
+      await shot(page, 'moving-prop');
+      // …and taken off again from its settings, then put back.
+      await page.getByTestId('moving-part').getByRole('button', { name: 'Stop animating' }).click();
+      await page.waitForTimeout(200);
+      doc = await hook(page, 'projectDoc');
+      assert(!(doc.props ?? []).length, `Stop animating removes the animated part (${(doc.props ?? []).length} left)`);
+      await page.getByTestId('moving-parts').getByText('Animate as steering wheel').click();
+      doc = await hook(page, 'projectDoc');
+      assert((doc.props ?? []).some((p) => p.func === 'steering'), 'steering wheel animated again');
+      // …and off again from the list itself.
+      await page.getByTestId('moving-parts').getByRole('button', { name: /^Stop animating / }).click();
+      await page.waitForTimeout(200);
+      assert(!((await hook(page, 'projectDoc')).props ?? []).length, 'the list row’s × removes the animated part');
+      await page.getByTestId('moving-parts').getByText('Animate as steering wheel').click();
       // Triggers: add a button, click on the car, make it the horn.
       await page.getByTestId('workspace-triggers').click();
       await page.getByTestId('triggers-panel').waitFor();

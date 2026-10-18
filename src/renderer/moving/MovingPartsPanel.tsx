@@ -1,15 +1,15 @@
 import { MovePartSwitch } from './MovePartSwitch';
 import { useEffect, useMemo } from 'react';
 import { create } from 'zustand';
-import { DoorOpen, FileCode, Gauge, GraduationCap, MoveHorizontal, WandSparkles, type LucideIcon } from 'lucide-react';
+import { DoorOpen, FileCode, Gauge, GraduationCap, MoveHorizontal, WandSparkles, X, type LucideIcon } from 'lucide-react';
 import { useProjectStore } from '@renderer/app/stores/project';
 import { allMeshes, useSceneStore } from '@renderer/app/stores/scene';
 import { useTaxonomy } from '@renderer/parts/taxonomy';
 import { hingeAll, unhingedParts } from '@renderer/hinges/commands';
 import { HingeSection } from '@renderer/hinges/HingeSection';
-import { addProp } from '@renderer/props/commands';
+import { addProp, removeProp } from '@renderer/props/commands';
 import { PropSection } from '@renderer/props/PropSection';
-import { addFromTemplate, useScriptUi } from '@renderer/scripts/commands';
+import { addFromTemplate, removeScript, useScriptUi } from '@renderer/scripts/commands';
 import { allTemplates, templateById } from '@renderer/scripts/registry';
 import { ScriptPanel } from '@renderer/scripts/ScriptPanel';
 import { withMeshNames } from '@shared/parts/meshNames';
@@ -85,10 +85,10 @@ export function MovingPartsPanel() {
     .filter((x): x is { m: (typeof meshes)[number]; kind: string } => !!x.kind);
 
   const isPicked = (p: Pick) => JSON.stringify(p) === JSON.stringify(picked);
-  const row = (p: Pick, icon: LucideIcon, title: string, meta: string, badge?: { text: string; tone: 'success' | 'warning' | 'neutral' }) => {
+  const row = (p: Pick, icon: LucideIcon, title: string, meta: string, badge?: { text: string; tone: 'success' | 'warning' | 'neutral' }, remove?: { label: string; run: () => void }) => {
     const Icon = icon;
     return (
-      <li key={JSON.stringify(p)}>
+      <li key={JSON.stringify(p)} className={own.item}>
         <button type="button" className={cx(own.row, isPicked(p) && own.rowOn)} onClick={() => pick(p)}>
           <Icon className={own.icon} aria-hidden />
           <span className={own.name}>{title}</span>
@@ -99,6 +99,7 @@ export function MovingPartsPanel() {
           )}
           <span className={own.meta}>{meta}</span>
         </button>
+        {remove && <IconButton size="sm" icon={X} label={remove.label} onClick={remove.run} data-testid="moving-remove" />}
       </li>
     );
   };
@@ -136,7 +137,7 @@ export function MovingPartsPanel() {
             <span className={own.title}>Animated parts</span>
           </header>
           <ul className={own.list}>
-            {props.map((p) => row({ kind: 'prop', meshKey: p.meshKey }, Gauge, nameOf(p.meshKey), `follows ${p.func}`))}
+            {props.map((p) => row({ kind: 'prop', meshKey: p.meshKey }, Gauge, nameOf(p.meshKey), `follows ${p.func}`, undefined, { label: `Stop animating ${nameOf(p.meshKey)}`, run: () => removeProp(p.id) }))}
             {suggestions.map(({ m, kind }) => (
               <li key={m.key}>
                 <button
@@ -171,7 +172,7 @@ export function MovingPartsPanel() {
           <header className={own.head}>
             <span className={own.title}>Scripted movement</span>
           </header>
-          <ul className={own.list}>{scripts.map((s) => row({ kind: 'script', id: s.id }, FileCode, s.label, templateById(s.templateId ?? '')?.name ?? s.name, s.enabled ? undefined : { text: 'Off', tone: 'neutral' }))}</ul>
+          <ul className={own.list}>{scripts.map((s) => row({ kind: 'script', id: s.id }, FileCode, s.label, templateById(s.templateId ?? '')?.name ?? s.name, s.enabled ? undefined : { text: 'Off', tone: 'neutral' }, { label: `Remove ${s.label}`, run: () => removeScript(s.id) }))}</ul>
           <Select
             value={undefined}
             onChange={(id) => {

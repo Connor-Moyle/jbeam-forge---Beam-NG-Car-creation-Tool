@@ -399,6 +399,8 @@ The **Sound** workspace (the tab after Engine) is the car's mixing desk. Everyth
 - engine-speed items like fans and pulleys
 - wheel-speed items
 
+To stop animating one, click the × on its row in the Moving parts list, or the bin at the top of its Animation section.
+
 Drag the preview slider to check it moves right before you commit.
 
 ### Lights, glass, aero, skins and the rest

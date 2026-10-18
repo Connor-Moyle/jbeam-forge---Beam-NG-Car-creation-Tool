@@ -26,6 +26,18 @@
   list-style: none;
 }
 
+.item {
+  display: flex;
+  align-items: center;
+  gap: var(--space-1);
+}
+
+.item > .row,
+.item > .rowOn {
+  flex: 1;
+  min-width: 0;
+}
+
 .row,
 .rowOn,
 .suggest {
