@@ -18,7 +18,7 @@ import { bodyPart, buildJbeamFiles, damagedMaterialName, nodesExported, SET_KIND
 import { placeRefNodes } from '@shared/proxy/derive';
 import type { Project } from '@shared/project/schema';
 import { buildGlowMap, lightFunction, onMaterialName } from '@shared/export/lights';
-import { loadFittedSets, useSetData, useSuspensionCatalogue } from '@renderer/suspension/commands';
+import { loadFittedSets, tyreFouls, useSetData, useSuspensionCatalogue } from '@renderer/suspension/commands';
 import { exportMeshNames, infoJson, materialsJson } from '@shared/export/files';
 import { withMeasured } from '@shared/export/performance';
 import { configFileName, configInfoJson, includedParts, resolveConfig } from '@shared/export/configs';
@@ -35,8 +35,8 @@ import { textureToDds, toBase64 } from './textureConvert';
 import { portedIssues, portedText } from '@shared/export/ported';
 import { installProblems } from '@shared/export/installCheck';
 import { stampGameVersion } from './gameVersion';
-import { setWheels, wheelNames } from '@shared/suspension/wheels';
-import { archWarning, nodesFoulingTyres } from '@shared/suspension/arch';
+import { wheelNames } from '@shared/suspension/wheels';
+import { archWarning } from '@shared/suspension/arch';
 import { suspensionLoadWarning } from '@shared/suspension/load';
 import { jbeamMaterialRefs } from '@shared/export/materialRefs';
 import { blendExportName, blendFileText, blendSamplePath, pitchSamples, type BlendSample } from '@shared/sound/blend';
@@ -314,16 +314,9 @@ export function prepareExport(): PreparedExport | null {
         report.warnings.push({ code: 'TRACK_STRETCH', message: `${s.name} on the ${a.name.replace(/ axle$/i, '').toLowerCase()} axle is ${ratio < 1 ? 'squeezed' : 'stretched'} to ${Math.round(ratio * 100)}% of its own width (${(s.track! * 1000).toFixed(0)} mm): more than about 10% either way can make its arms fight and come apart at spawn. Keep the axle's track near ${(s.track! * 1000).toFixed(0)} mm, or pick a suspension from a car this wide.` });
     }
   }
-  // Structure of the car's own that starts inside a fitted suspension's tyres.
-  const partNames = new Map(doc.parts.map((p) => [p.id, p.displayName]));
-  const ownNodes = doc.nodes.filter((n) => partNames.has(n.partId) && !SET_KINDS.has(doc.parts.find((p) => p.id === n.partId)?.taxonomyId ?? '')).map((n) => ({ pos: n.pos, part: partNames.get(n.partId)! }));
-  for (const a of fittedAxles) {
-    const set = catalogue.find((s) => s.id === a.fitted!.setId);
-    const parts = useSetData.getState().data[a.fitted!.setId]?.parts;
-    if (!set?.tyre || !parts) continue;
-    const offset = doc.sources.find((s) => s.id === a.fitted!.sourceId)?.placement.position ?? [0, 0, 0];
-    const inside = nodesFoulingTyres(setWheels(parts, offset), set.tyre, ownNodes);
-    const text = archWarning(a.name.replace(/ axle$/i, '').toLowerCase(), set, set.tyre, inside);
+  // Structure of the car's own that starts inside a fitted suspension's tyres (the dialog's button moves it out).
+  for (const f of tyreFouls(doc)) {
+    const text = archWarning(f.axle.name.replace(/ axle$/i, '').toLowerCase(), f.set, f.tyre, f.inside);
     if (text) report.warnings.push({ code: 'TYRE_IN_STRUCTURE', message: text });
   }
   // Two axles of one end (a twin-steer truck's, a tandem's): the later one carries its own copies of

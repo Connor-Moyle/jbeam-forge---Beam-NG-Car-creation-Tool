@@ -449,7 +449,7 @@ Every setting in the engine and gearbox builders has a little game-pad button. P
 
 ...and zips it. There's also a loose-files export under Advanced if you want to poke at things by hand.
 
-**The validator** won't let you export things that are guaranteed to break in-game, like a part without a flexbody (invisible part), a flexbody pointing at a mesh that isn't in the DAE, nodes without a group, slots pointing at nothing, missing reference nodes or missing textures. Everything else comes up as a warning you can choose to ignore. It'll also offer to run a quick settle test before exporting.
+**The validator** won't let you export things that are guaranteed to break in-game, like a part without a flexbody (invisible part), a flexbody pointing at a mesh that isn't in the DAE, nodes without a group, slots pointing at nothing, missing reference nodes or missing textures. Everything else comes up as a warning you can choose to ignore. Some warnings come with their fix: **Generate missing** for parts without structure, and **Move the nodes out of the tyres** when the body's nodes start inside the game's tyres (the game would push them out at spawn and bend the wings). It'll also offer to run a quick settle test before exporting.
 
 **Publish panel.** Set tags, version and changelog, manage the icon, and bump the version into the info file. Then run the pre-publish checklist (validation passed, every config has a preview, no placeholder parts left, zip size OK, the final zip actually parses) and get a repository-ready zip plus a description you can paste straight into the upload page.
 

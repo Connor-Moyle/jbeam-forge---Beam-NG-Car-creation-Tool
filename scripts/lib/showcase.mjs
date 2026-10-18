@@ -476,6 +476,16 @@ export async function showcaseBuild({ page, base, plan, model, hook, shot, asser
   await page.getByTestId('export-dialog').waitFor();
   await page.waitForTimeout(1500);
   await shot(page, 'showcase-export-dialog');
+  // Nodes that start inside the game's tyres: the dialog's button moves them out, and the warning goes.
+  const clearTyres = page.getByTestId('export-clear-tyres');
+  if (await clearTyres.count()) {
+    const fouls = async () => ((await page.getByTestId('export-dialog').textContent()) ?? '').match(/are inside them/g)?.length ?? 0;
+    const before = await fouls();
+    await clearTyres.click();
+    for (let i = 0; i < 100 && ((await fouls()) >= before || (await page.getByTestId('export-install').isDisabled())); i++) await page.waitForTimeout(100);
+    const after = await fouls();
+    assert(after < before, `moving the nodes out of the tyres clears the warning (${before} → ${after})`);
+  }
   const dialogText = await page.getByTestId('export-dialog').textContent();
   writeFileSync(join(outDir, 'showcase-export-dialog.txt'), dialogText);
   assert(!(await page.getByTestId('export-install').isDisabled()), `the export is not blocked:\n${dialogText.slice(0, 1500)}`);

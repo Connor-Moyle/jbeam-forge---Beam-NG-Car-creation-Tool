@@ -51,6 +51,25 @@ export function nodesInTyre<T extends { pos: V3 }>(wheel: { centre: V3; axis: V3
   });
 }
 
+/** Room kept between a moved node and the tread (m). */
+export const TYRE_CLEARANCE = 0.02;
+
+/**
+ * Where a node inside a tyre goes: straight out from the wheel's axis to just past the tread, at
+ * the same place along the axis (a node on the axis itself goes up).
+ */
+export function outOfTyre(pos: V3, wheel: { centre: V3; axis: V3 }, tyre: StockTyre, clearance = TYRE_CLEARANCE): [number, number, number] {
+  const l = Math.hypot(wheel.axis[0], wheel.axis[1], wheel.axis[2]) || 1;
+  const u = [wheel.axis[0] / l, wheel.axis[1] / l, wheel.axis[2] / l];
+  const v = [pos[0] - wheel.centre[0], pos[1] - wheel.centre[1], pos[2] - wheel.centre[2]];
+  const along = v[0]! * u[0]! + v[1]! * u[1]! + v[2]! * u[2]!;
+  const radial = [v[0]! - along * u[0]!, v[1]! - along * u[1]!, v[2]! - along * u[2]!];
+  const r = Math.hypot(radial[0]!, radial[1]!, radial[2]!);
+  const dir = r > 1e-6 ? radial.map((c) => c / r) : [0, 0, 1];
+  const want = tyre.radius + clearance;
+  return [0, 1, 2].map((i) => wheel.centre[i]! + along * u[i]! + dir[i]! * want) as [number, number, number];
+}
+
 /** Deep enough that one node alone is trouble (m). */
 export const TYRE_DEEP = 0.09;
 

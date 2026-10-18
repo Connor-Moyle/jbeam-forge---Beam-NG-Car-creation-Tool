@@ -5,6 +5,7 @@ import { ArrowLeft, ClipboardCopy, Download, FolderOpen, PackageCheck, RefreshCw
 import type { PublishListing } from '@shared/ipc-contract';
 import { call } from '@renderer/diagnostics/ipc';
 import { generateParts, useStructureUi } from '@renderer/structure/generate';
+import { moveNodesOutOfTyres } from '@renderer/suspension/commands';
 import { Badge } from '@renderer/ui/components/Badge';
 import { Button } from '@renderer/ui/components/Button';
 import { Callout } from '@renderer/ui/components/Callout';
@@ -167,6 +168,20 @@ export function ExportDialog() {
               <section>
                 <p className={styles.heading}>
                   Warnings <Badge tone="warning">{warnings.length}</Badge>
+                  {warnings.some((w) => w.code === 'TYRE_IN_STRUCTURE') && (
+                    <Button
+                      size="sm"
+                      icon={Wand2}
+                      onClick={() => {
+                        moveNodesOutOfTyres();
+                        refreshExport();
+                      }}
+                      disabled={!!busy}
+                      data-testid="export-clear-tyres"
+                    >
+                      Move the nodes out of the tyres
+                    </Button>
+                  )}
                 </p>
                 <ScrollArea className={styles.list}>
                   <ul data-testid="export-warnings">

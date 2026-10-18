@@ -19,13 +19,59 @@ import { assignToNewPart } from '@renderer/parts/commands';
 import { IDENTITY_EDIT } from '@shared/mesh/meshEdit';
 import { ownWheelFittings, setTrack, setWheels } from '@shared/suspension/wheels';
 import { bakeSlotOffsets } from '@shared/suspension/transplant';
-import { axleTags } from '@shared/export/jbeam';
+import { axleTags, SET_KINDS } from '@shared/export/jbeam';
 import type { JbeamObject } from '@shared/jbeam/parse';
+import type { Project } from '@shared/project/schema';
+import { nodesFoulingTyres, outOfTyre, type StockTyre } from '@shared/suspension/arch';
+import type { SetWheel } from '@shared/suspension/wheels';
 
 /**
  * Suspension workshop (Phase 10): the car's axles, and complete suspensions
  * from the stock vehicles fitted to them.
  */
+
+/** Per fitted axle: the car's own nodes that start inside its tyres (none: nothing to say). */
+export function tyreFouls(doc: Project): { axle: Axle; set: SuspensionSet; tyre: StockTyre; wheels: SetWheel[]; inside: { id: string; pos: Project['nodes'][number]['pos']; part: string }[] }[] {
+  const catalogue = useSuspensionCatalogue.getState().sets ?? [];
+  const partNames = new Map(doc.parts.map((p) => [p.id, p.displayName]));
+  const setPart = new Set(doc.parts.filter((p) => SET_KINDS.has(p.taxonomyId)).map((p) => p.id));
+  const ownNodes = doc.nodes.filter((n) => partNames.has(n.partId) && !setPart.has(n.partId)).map((n) => ({ id: n.id, pos: n.pos, part: partNames.get(n.partId)! }));
+  const out = [];
+  for (const axle of (doc.axles ?? []).filter((a) => a.fitted)) {
+    const set = catalogue.find((s) => s.id === axle.fitted!.setId);
+    const parts = useSetData.getState().data[axle.fitted!.setId]?.parts;
+    if (!set?.tyre || !parts) continue;
+    const offset = doc.sources.find((s) => s.id === axle.fitted!.sourceId)?.placement.position ?? [0, 0, 0];
+    const wheels = setWheels(parts, offset);
+    out.push({ axle, set, tyre: set.tyre, wheels, inside: nodesFoulingTyres(wheels, set.tyre, ownNodes) });
+  }
+  return out;
+}
+
+/** Move every node that starts inside a fitted suspension's tyres out to just past the tread (undoable). Returns how many moved. */
+export function moveNodesOutOfTyres(): number {
+  const doc = projectStore.getState().doc;
+  if (!doc) return 0;
+  const moves = new Map<string, [number, number, number]>();
+  for (const f of tyreFouls(doc)) {
+    for (const n of f.inside) {
+      // The wheel it is in (the nearest axis).
+      const w = f.wheels.reduce((best, x) => (Math.hypot(x.centre[0] - n.pos[0], x.centre[1] - n.pos[1], x.centre[2] - n.pos[2]) < Math.hypot(best.centre[0] - n.pos[0], best.centre[1] - n.pos[1], best.centre[2] - n.pos[2]) ? x : best));
+      moves.set(n.id, outOfTyre(moves.get(n.id) ?? n.pos, w, f.tyre));
+    }
+  }
+  if (!moves.size) return 0;
+  projectStore.getState().execute({
+    label: `Move ${moves.size} node${moves.size === 1 ? '' : 's'} out of the tyres`,
+    apply: (d) => {
+      for (const n of d.nodes) {
+        const to = moves.get(n.id);
+        if (to) Object.assign(n, { pos: to, manual: true });
+      }
+    },
+  });
+  return moves.size;
+}
 
 /** The catalogue of complete suspensions (from the BeamNG install; reloaded after a library scan). */
 export const useSuspensionCatalogue = create<{ sets: SuspensionSet[] | null; load: (force?: boolean) => Promise<void> }>()((set, get) => ({

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { archWarning, nodesFoulingTyres, nodesInTyre, tyreOf } from '../../src/shared/suspension/arch';
+import { archWarning, nodesFoulingTyres, nodesInTyre, outOfTyre, tyreOf } from '../../src/shared/suspension/arch';
 
 describe('a tyre against the car’s own structure', () => {
   it('reads a tyre’s size from the game’s wheel table', () => {
@@ -23,6 +23,17 @@ describe('a tyre against the car’s own structure', () => {
     // Where only the hub face is known, the tyre is outboard of it: the body's node inboard doesn't count.
     const hub = { centre: [0.6, -1.3, 0.33], axis: [1, 0, 0], exact: false } as const;
     expect(nodesInTyre(hub, tyre, nodes).map((n) => n.id)).toEqual(['fe8l']);
+  });
+
+  it('moves a node straight out of the tyre to just past the tread, keeping its place along the axle', () => {
+    const moved = outOfTyre([0.8, -1.05, 0.5], wheel, tyre);
+    expect(moved[0]).toBeCloseTo(0.8); // same place along the axle
+    expect(Math.hypot(moved[1] - wheel.centre[1], moved[2] - wheel.centre[2])).toBeCloseTo(tyre.radius + 0.02);
+    // Same direction from the axis as before.
+    expect((moved[1] - wheel.centre[1]) / (moved[2] - wheel.centre[2])).toBeCloseTo((-1.05 + 1.3) / (0.5 - 0.33));
+    expect(nodesInTyre(wheel, tyre, [{ pos: moved }])).toEqual([]);
+    // On the axis itself: up.
+    expect(outOfTyre([0.8, -1.3, 0.33], wheel, tyre)).toEqual([0.8, -1.3, 0.33 + tyre.radius + 0.02]);
   });
 
   it('lets one shallow arch-lip node a side pass, and speaks up for a deep one or several', () => {
