@@ -65,9 +65,7 @@ const argBy = (ps: readonly Pt[], f: (p: Pt) => number): Vec3 => [...ps.reduce((
  * whichever moves the part away from the body.
  */
 export function guessHinge(kind: string, part: readonly Pt[], body: readonly Pt[]): HingeGuess {
-  const lo: Vec3 = [Math.min(...part.map((p) => p[0])), Math.min(...part.map((p) => p[1])), Math.min(...part.map((p) => p[2]))];
-  const hi: Vec3 = [Math.max(...part.map((p) => p[0])), Math.max(...part.map((p) => p[1])), Math.max(...part.map((p) => p[2]))];
-  const size = sub(hi, lo);
+  const { lo, hi, size } = box(part);
   const mid = centroid(part);
   const band = (axis: 0 | 1 | 2, end: 'lo' | 'hi', frac = 0.12) => part.filter((p) => (end === 'lo' ? p[axis] <= lo[axis] + size[axis] * frac : p[axis] >= hi[axis] - size[axis] * frac));
   const side = mid[0] >= 0 ? 1 : -1; // +X is the car's left
@@ -111,9 +109,57 @@ export function guessHinge(kind: string, part: readonly Pt[], body: readonly Pt[
     }
   }
 
-  // Swing away from the body: test both ways with a small angle.
+  return { axis, direction: swingAway(mid, axis, body), latch, handles };
+}
+
+/** Swing away from the body: test both ways with a small angle. */
+function swingAway(mid: Pt, axis: readonly [Pt, Pt], body: readonly Pt[]): 1 | -1 {
   const b = centroid(body.length ? body : [[0, 0, 0]]);
   const away = (sign: 1 | -1) => dist(rotateAbout(mid, axis[0], axis[1], 20 * sign), b);
-  const direction: 1 | -1 = away(1) >= away(-1) ? 1 : -1;
-  return { axis, direction, latch, handles };
+  return away(1) >= away(-1) ? 1 : -1;
+}
+
+/** An edge of a part's box, in BeamNG space (+X left, −Y front, +Z up). */
+export type HingeEdge = 'front' | 'rear' | 'left' | 'right' | 'top' | 'bottom';
+export const HINGE_EDGES: readonly HingeEdge[] = ['front', 'rear', 'left', 'right', 'top', 'bottom'];
+const EDGE_SIDE: Record<HingeEdge, { axis: 0 | 1 | 2; end: 'lo' | 'hi' }> = { front: { axis: 1, end: 'lo' }, rear: { axis: 1, end: 'hi' }, left: { axis: 0, end: 'hi' }, right: { axis: 0, end: 'lo' }, top: { axis: 2, end: 'hi' }, bottom: { axis: 2, end: 'lo' } };
+const EDGE_BAND = 0.15;
+
+function box(part: readonly Pt[]) {
+  const lo: Vec3 = [Math.min(...part.map((p) => p[0])), Math.min(...part.map((p) => p[1])), Math.min(...part.map((p) => p[2]))];
+  const hi: Vec3 = [Math.max(...part.map((p) => p[0])), Math.max(...part.map((p) => p[1])), Math.max(...part.map((p) => p[2]))];
+  return { lo, hi, size: sub(hi, lo) };
+}
+
+function onEdge(p: Pt, edge: HingeEdge, b: ReturnType<typeof box>): boolean {
+  const { axis, end } = EDGE_SIDE[edge];
+  if (b.size[axis] < 1e-6) return false; // a flat part has no edge across its thickness
+  return end === 'lo' ? p[axis] <= b.lo[axis] + b.size[axis] * EDGE_BAND : p[axis] >= b.hi[axis] - b.size[axis] * EDGE_BAND;
+}
+
+/** The edge of the part's box both hinge points sit on, or null (a line set by hand). */
+export function hingeEdge(axis: readonly [Pt, Pt], part: readonly Pt[]): HingeEdge | null {
+  if (!part.length) return null;
+  const b = box(part);
+  return HINGE_EDGES.find((e) => onEdge(axis[0], e, b) && onEdge(axis[1], e, b)) ?? null;
+}
+
+/**
+ * The hinge moved to an edge of the part (a bonnet that opens from the front,
+ * a gull-wing door): the line runs the length of that edge, the latch sits on
+ * the opposite edge, the swing goes away from the body.
+ */
+export function edgeHinge(edge: HingeEdge, part: readonly Pt[], body: readonly Pt[]): Pick<HingeGuess, 'axis' | 'direction' | 'latch'> {
+  const b = box(part);
+  const { axis: a, end } = EDGE_SIDE[edge];
+  const onBand = part.filter((p) => onEdge(p, edge, b));
+  // The line runs along the edge's longer dimension (up a door, across a bonnet).
+  const others = ([0, 1, 2] as const).filter((i) => i !== a);
+  const along = b.size[others[0]!] >= b.size[others[1]!] ? others[0]! : others[1]!;
+  const axis: [Vec3, Vec3] = [argBy(onBand, (p) => p[along]), argBy(onBand, (p) => -p[along])];
+  const opposite: HingeEdge = HINGE_EDGES.find((e) => EDGE_SIDE[e].axis === a && EDGE_SIDE[e].end !== end)!;
+  const far = part.filter((p) => onEdge(p, opposite, b));
+  const mid = centroid(part);
+  const latch = far.length ? argBy(far, (p) => Math.abs(p[along] - mid[along])) : null;
+  return { axis, direction: swingAway(mid, axis, body), latch };
 }

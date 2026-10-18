@@ -414,6 +414,23 @@ describe('validateExport', () => {
     expect(r.warnings.map((w) => w.code).sort()).toEqual(['meshes-unassigned', 'openable-unhinged']);
   });
 
+  it('says nothing about a part the export leaves out, and warns about one that exports as bare structure', () => {
+    const { doc, meshes } = carProject();
+    // The hood's mesh taken away and its structure gone: nothing left, left out of the mod.
+    const d1 = carProject().doc;
+    const hoodKeys = Object.keys(d1.assignments).filter((k) => d1.assignments[k] === 'p_hood');
+    for (const k of hoodKeys) delete d1.assignments[k];
+    d1.nodes = d1.nodes.filter((n) => n.partId !== 'p_hood');
+    d1.beams = d1.beams.filter((b) => b.partId !== 'p_hood');
+    d1.tris = d1.tris.filter((t) => t.partId !== 'p_hood');
+    expect(run(d1, meshes).warnings.map((w) => w.code)).not.toContain('part-empty');
+    // Mesh taken away but structure kept: it exports, invisible.
+    const d2 = carProject().doc;
+    for (const k of hoodKeys) delete d2.assignments[k];
+    expect(run(d2, meshes).warnings.find((w) => w.code === 'part-empty')?.partId).toBe('p_hood');
+    expect(run(doc, meshes).warnings.map((w) => w.code)).not.toContain('part-empty');
+  });
+
   it('hard-fails the mistakes that made the old build invisible or broken', () => {
     const { doc, meshes } = carProject();
     // 1. flexbody mesh missing from the DAE

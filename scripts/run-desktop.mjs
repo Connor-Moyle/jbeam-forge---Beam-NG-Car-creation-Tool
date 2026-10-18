@@ -1905,6 +1905,17 @@ const scenarios = [
       await swingThumb.focus();
       await page.keyboard.press('Home');
       await page.getByRole('switch', { name: /Move the part itself/ }).first().click();
+      // The hood hinges at its rear edge; put it on the front edge instead (the latch moves to the rear).
+      const hoodHinge = () => hook(page, 'projectDoc').then((d) => d.hinges.find((h) => d.parts.find((p) => p.id === h.partId)?.displayName === 'Hood'));
+      const was = await hoodHinge();
+      await page.getByRole('combobox', { name: 'Hinges on' }).click();
+      await page.getByRole('option', { name: 'Front edge' }).click();
+      await page.waitForTimeout(200);
+      const now = await hoodHinge();
+      assert(now.axis[0][1] < was.axis[0][1] - 0.3 && now.latch[1] > was.latch[1] + 0.3, `hood hinge moved to the front edge (y ${was.axis[0][1].toFixed(2)} → ${now.axis[0][1].toFixed(2)}, latch ${was.latch[1].toFixed(2)} → ${now.latch[1].toFixed(2)})`);
+      await page.getByRole('combobox', { name: 'Hinges on' }).click();
+      await page.getByRole('option', { name: 'Rear edge' }).click();
+      await page.waitForTimeout(200);
       await shot(page, 'moving-parts');
       // The steering wheel is suggested for animation.
       await page.getByTestId('moving-parts').getByText('Animate as steering wheel').click();
@@ -4233,8 +4244,12 @@ const scenarios = [
       await page.getByTestId('toolbar-generate').click();
       for (let i = 0; i < 1800 && !((await hook(page, 'projectDoc')).nodes.length > 50); i++) await page.waitForTimeout(100);
       await page.waitForTimeout(1500);
-      // The generated project, for offline physics checks (scripts/dev/simParts.mts).
+      // The generated project, for offline physics checks (scripts/dev/simParts.mts): before the hinges, whose latches are the game's couplers, which the stands check doesn't model.
       writeFileSync(join(outDir, 'practice-doc.json'), JSON.stringify(await hook(page, 'projectDoc')));
+      // Every door, the hood and the trunk hinged (variants are covered by the showcase estate's Sport hood).
+      await hook(page, 'hingeAll');
+      const hinged = (await hook(page, 'projectDoc')).hinges.length;
+      assert(hinged >= 4, `Hinge all hinges the doors, hood and trunk (${hinged})`);
       await page.getByTestId('toolbar-export').click();
       await page.getByTestId('export-dialog').waitFor();
       await shot(page, 'practice-export-dialog');

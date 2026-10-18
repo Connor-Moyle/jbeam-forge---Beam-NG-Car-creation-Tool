@@ -9,7 +9,7 @@ import { meshoptReady } from '../../src/shared/proxy/shapes';
 import { generateStructure } from '../../src/shared/proxy/generate';
 import { buildJbeamFiles } from '../../src/shared/export/jbeam';
 import { parseJbeam } from '../../src/shared/jbeam/parse';
-import { guessHinge, limiterBound, rotateAbout } from '../../src/shared/hinges/geometry';
+import { edgeHinge, guessHinge, hingeEdge, limiterBound, rotateAbout } from '../../src/shared/hinges/geometry';
 import { HINGE_DEFAULTS, hingeAction, HingeSchema, type Hinge } from '../../src/shared/hinges/schema';
 import { buildSimModel } from '../../src/shared/sim/model';
 import { hingeSwing, hingeYank } from '../../src/shared/sim/scenarios';
@@ -49,6 +49,23 @@ describe('hinge geometry', () => {
   it('rotates about a line (right-hand rule)', () => {
     const p = rotateAbout([1, 0, 0], [0, 0, 0], [0, 0, 1], 90);
     expect(p.map((v) => Math.round(v * 1e6) / 1e6)).toEqual([0, 1, 0]);
+  });
+
+  it('moves the hinge to a chosen edge and names the edge a line sits on', () => {
+    // A bonnet: 1.4 m wide (x), 1 m long (y ∈ [−2, −1]), flat, nodes at its corners and edge middles.
+    const bonnet: [number, number, number][] = [];
+    for (const x of [-0.7, 0, 0.7]) for (const y of [-2, -1.5, -1]) bonnet.push([x, y, 1]);
+    const body: [number, number, number][] = [[0, 0, 0.5]];
+    const rear = guessHinge('hood', bonnet, body);
+    expect(hingeEdge(rear.axis, bonnet)).toBe('rear');
+    const front = edgeHinge('front', bonnet, body);
+    expect(front.axis.map((p) => p[1])).toEqual([-2, -2]);
+    expect(front.axis.map((p) => p[0]).sort()).toEqual([-0.7, 0.7]); // across the bonnet, not along it
+    expect(front.latch).toEqual([0, -1, 1]); // the opposite edge, centred
+    expect(hingeEdge(front.axis, bonnet)).toBe('front');
+    const side = edgeHinge('left', bonnet, body);
+    expect(side.axis.map((p) => p[0])).toEqual([0.7, 0.7]);
+    expect(hingeEdge([[0, -1.5, 1], [0.7, -1.5, 1]], bonnet)).toBeNull(); // across the middle: no edge
   });
 
   it('sizes the limiter bound from the opening angle', () => {

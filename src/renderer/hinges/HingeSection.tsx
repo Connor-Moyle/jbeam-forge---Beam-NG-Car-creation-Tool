@@ -13,7 +13,8 @@ import { Slider } from '@renderer/ui/components/Slider';
 import { Toggle } from '@renderer/ui/components/Toggle';
 import { HINGE_DEFAULTS } from '@shared/hinges/schema';
 import type { Part } from '@shared/project/schema';
-import { addHinge, hingeAll, hingeFromSelection, hingeProblem, removeHinge, reguessHinge, unhingedParts, updateHinge, useHingeUi } from './commands';
+import { HINGE_EDGES, hingeEdge } from '@shared/hinges/geometry';
+import { addHinge, hingeAll, hingeFromSelection, hingeProblem, removeHinge, reguessHinge, setHingeEdge, unhingedParts, updateHinge, useHingeUi } from './commands';
 import styles from './HingeSection.module.css';
 
 /** The game's input actions that open things (what the player presses, and what handles trigger). */
@@ -28,6 +29,7 @@ export function HingeSection({ part }: { part: Part }) {
   const selected = useEditStore((s) => s.nodes);
   const swing = useHingeUi((s) => s.swing);
   const others = useProjectStore((s) => (s.doc ? unhingedParts(s.doc).ready.filter((id) => id !== part.id).length : 0));
+  const edge = useProjectStore((s) => (hinge ? hingeEdge(hinge.axis, s.doc!.nodes.filter((n) => n.partId === part.id).map((n) => n.pos)) : null));
   const pushStatus = useUiStore((s) => s.pushStatus);
 
   // Show this part's hinge in the viewport while its section is open.
@@ -70,13 +72,18 @@ export function HingeSection({ part }: { part: Part }) {
         <Slider value={hinge.openAngle} onChange={(openAngle) => set({ openAngle }, 'Change opening angle')} min={5} max={180} step={1} format={(v) => `${v}°`} aria-label="Opening angle" />
       </Field>
       <div className={styles.row}>
-        <Field label="Opened by" hint="The game’s key for it; handles trigger the same.">
-          <Select value={hinge.action} onChange={(action) => set({ action }, 'Change hinge action')} options={[...new Set([hinge.action, ...ACTIONS])].map((a) => ({ value: a, label: a }))} aria-label="Opened by" />
+        <Field label="Hinges on" hint="Which edge of the part the hinge line runs along: a bonnet that opens from the front, a gull-wing door. The latch moves to the opposite edge.">
+          <Select value={edge ?? 'custom'} onChange={(e) => e !== 'custom' && setHingeEdge(part.id, e)} options={[...HINGE_EDGES.map((e) => ({ value: e, label: `${e[0]!.toUpperCase()}${e.slice(1)} edge` })), ...(edge ? [] : [{ value: 'custom' as const, label: 'Two nodes (set below)' }])]} aria-label="Hinges on" data-testid="hinge-edge" />
         </Field>
         <Field label="Direction">
           <Button icon={FlipHorizontal2} onClick={() => set({ direction: hinge.direction === 1 ? -1 : 1 }, 'Flip swing direction')} data-testid="hinge-flip">
             Flip swing
           </Button>
+        </Field>
+      </div>
+      <div className={styles.row}>
+        <Field label="Opened by" hint="The game’s key for it; handles trigger the same.">
+          <Select value={hinge.action} onChange={(action) => set({ action }, 'Change hinge action')} options={[...new Set([hinge.action, ...ACTIONS])].map((a) => ({ value: a, label: a }))} aria-label="Opened by" />
         </Field>
       </div>
       <dl className={styles.points} data-testid="hinge-points">

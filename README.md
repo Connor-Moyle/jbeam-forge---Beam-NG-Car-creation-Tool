@@ -325,7 +325,7 @@ Broken beams and unstable nodes are listed in the results panel. Click one to ju
 ![The Moving parts workspace](docs/images/hinge.png)
 
 1. Enter hinge mode and click the door, bonnet or boot.
-2. Let Forge find the hinge axis from the closest edge, or click two points yourself. Both points stay draggable.
+2. Let Forge find the hinge axis from the closest edge, pick another edge under **Hinges on** (a bonnet that opens from the front, a gull-wing door; the latch moves to the opposite edge), or set the line from two selected nodes. **Flip swing** turns it the other way.
 3. The part **swings open and closed in the viewport on a loop** so you can see straight away whether the axis is right. Use the slider to set how far it opens.
 4. Click where the latch goes.
 5. Click the handle positions (outside and inside) so you can open it on foot in-game.

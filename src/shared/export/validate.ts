@@ -1,7 +1,7 @@
 import type { Project } from '../project/schema';
 import { partRole, partSettings } from '../proxy/generate';
 import { GAME_SET_IDS } from '../proxy/presets';
-import { bodyPart, flexGroupOf, slotTypeOf, type TaxonomyLookup } from './jbeam';
+import { bodyPart, flexGroupOf, isEmptyPart, slotTypeOf, type TaxonomyLookup } from './jbeam';
 
 /**
  * Export validation (SPEC §3.2, §4.15). Hard failures block export — they are
@@ -77,10 +77,9 @@ export function validateExport(doc: Doc, tax: TaxonomyLookup, input: ValidationI
     const meshes = Object.keys(doc.assignments).filter((k) => doc.assignments[k] === part.id && !doc.ignoredMeshes.includes(k));
     const role = partRole(entry, partSettings(doc, part, entry));
     const hasNodes = doc.nodes.some((n) => n.partId === part.id);
-    const allIgnored = meshes.length === 0 && Object.keys(doc.assignments).some((k) => doc.assignments[k] === part.id);
-    // Every mesh set to Ignore (a model's own wheels under a game suspension): the part is left out of the mod, nothing to say.
+    // Nothing in it at all (a model's own wheels under a game suspension, ignored or unassigned): the export leaves it out, nothing to say.
     if (meshes.length === 0) {
-      if (!allIgnored) warn('part-empty', `${part.displayName} has no meshes; it exports as an empty slot option.`, part.id);
+      if (!isEmptyPart(doc, part)) warn('part-empty', `${part.displayName} has no meshes; it exports as an invisible structure (an empty slot option).`, part.id);
       continue;
     }
     if (role === 'own' && !hasNodes && !GAME_SET_IDS.has(part.taxonomyId)) {

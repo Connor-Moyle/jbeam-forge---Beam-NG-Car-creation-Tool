@@ -3,7 +3,7 @@ import { projectStore } from '@renderer/app/stores/project';
 import { useUiStore } from '@renderer/app/stores/ui';
 import { currentTaxonomy } from '@renderer/parts/taxonomy';
 import { clearHinge } from '@shared/hinges/apply';
-import { guessHinge } from '@shared/hinges/geometry';
+import { edgeHinge, guessHinge, type HingeEdge } from '@shared/hinges/geometry';
 import { defaultOpenAngle, hingeAction, HINGE_DEFAULTS, type Hinge, type Vec3 } from '@shared/hinges/schema';
 import type { Project } from '@shared/project/schema';
 import { hingeUp, nodePrefix, reattachPart } from '@shared/proxy/generate';
@@ -115,7 +115,8 @@ export function unhingedParts(doc: Project): { ready: string[]; blocked: { partI
   const ready: string[] = [];
   const blocked: { partId: string; problem: string }[] = [];
   for (const p of doc.parts) {
-    if (p.variantOf || doc.hinges.some((h) => h.partId === p.id) || !currentTaxonomy().entry(p.taxonomyId)?.openable) continue;
+    // Variants too (a Sport hood has its own nodes, and its own hinge): only one of a slot is ever installed.
+    if (doc.hinges.some((h) => h.partId === p.id) || !currentTaxonomy().entry(p.taxonomyId)?.openable) continue;
     const problem = hingeProblem(doc, p.id);
     if (problem) blocked.push({ partId: p.id, problem });
     else ready.push(p.id);
@@ -172,6 +173,19 @@ export function reguessHinge(partId: string): void {
     doc.nodes.filter((n) => n.partId === c.part.parentPartId).map((n) => n.pos),
   );
   updateHinge(partId, { axis: guess.axis, direction: guess.direction, latch: guess.latch, handles: guess.handles }, 'Re-guess hinge');
+}
+
+/** Move the hinge line to an edge of the part (the latch follows to the opposite edge; handles stay). */
+export function setHingeEdge(partId: string, edge: HingeEdge): void {
+  const doc = projectStore.getState().doc;
+  const c = doc && context(doc, partId);
+  if (!doc || !c || hingeProblem(doc, partId)) return;
+  const moved = edgeHinge(
+    edge,
+    doc.nodes.filter((n) => n.partId === partId).map((n) => n.pos),
+    doc.nodes.filter((n) => n.partId === c.part.parentPartId).map((n) => n.pos),
+  );
+  updateHinge(partId, moved, `Hinge on the ${edge} edge`);
 }
 
 /** Take the hinge off: the part is bolted shut to its parent again. */
