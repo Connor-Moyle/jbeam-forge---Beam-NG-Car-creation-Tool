@@ -1,4 +1,5 @@
 import type { Features, Skin } from '../project/schema';
+import { DEFAULT_HORN } from '../sound/blend';
 import type { WritableObject, WritableValue } from '../jbeam/serialize';
 
 /**
@@ -54,6 +55,8 @@ export interface FeatureExport {
   partSlots: Map<string, WritableValue[]>;
   /** part name → content. */
   parts: Record<string, WritableObject>;
+  /** Sections for the body part (its sounds). */
+  bodySections: Record<string, WritableValue>;
 }
 
 export const skinSlug = (skin: Pick<Skin, 'name'>) => skin.name.toLowerCase().replace(/[^a-z0-9]+/g, '_').replace(/^_|_$/g, '') || 'skin';
@@ -83,7 +86,7 @@ function freeId(ctx: Pick<FeatureContext, 'nodes'>, base: string): string {
 }
 
 export function buildFeatureParts(features: Features, ctx: FeatureContext): FeatureExport {
-  const out: FeatureExport = { mainSlots: [...GLOBAL_SLOTS], partSlots: new Map(), parts: {} };
+  const out: FeatureExport = { mainSlots: [...GLOBAL_SLOTS], partSlots: new Map(), parts: {}, bodySections: {} };
   const info = (name: string, value: number) => ({ authors: ctx.author || 'JBeam Forge', name, value });
   const mountOf = (partId: string) => (ctx.hasPart(partId) ? partId : ctx.bodyPartId);
   /** Declare a slot on the mount part (or the main part), filled by default. */
@@ -94,6 +97,10 @@ export function buildFeatureParts(features: Features, ctx: FeatureContext): Feat
     out.partSlots.set(partId, rows);
   };
   const flexRow = (mesh: string, group: string, pos: Vec3, rot: Vec3) => [mesh, [group], [], { pos: xyz(pos), rot: xyz(rot), scale: { x: 1, y: 1, z: 1 } }];
+  // The horn: a slot on the body as every stock car has, filled from the game's soundscape parts
+  // (without it the mod has no horn at all). The cabin's muffling goes in the body's sounds.
+  slotOn(ctx.bodyPartId, ['soundscape_horn', ['soundscape_horn'], [], features.sound?.horn || DEFAULT_HORN, 'Horn']);
+  if (features.sound?.cabinFilterCoef !== null && features.sound?.cabinFilterCoef !== undefined) out.bodySections.sounds = { cabinFilterCoef: r4(features.sound.cabinFilterCoef) };
 
   for (const [end, label, turn] of [['front', 'Front License Plate', 0], ['rear', 'Rear License Plate', 180]] as const) {
     const plate = features.plates[end];

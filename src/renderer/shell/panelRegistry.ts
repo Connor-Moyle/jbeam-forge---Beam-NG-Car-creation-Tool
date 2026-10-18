@@ -1,5 +1,5 @@
 import type { ComponentType } from 'react';
-import { Box, BadgePlus, PaintRoller, CarFront, FileCode, Gauge, ListTree, Wrench, Package, FlaskConical, FolderTree, LayoutGrid, Palette, SlidersHorizontal, ScrollText, Code2, FlaskRound, Table2, DoorOpen, MousePointerClick, CircleDot, Disc3, LayoutTemplate, PanelTop, Pentagon, type LucideIcon } from 'lucide-react';
+import { Box, BadgePlus, PaintRoller, Volume2, CarFront, FileCode, Gauge, ListTree, Wrench, Package, FlaskConical, FolderTree, LayoutGrid, Palette, SlidersHorizontal, ScrollText, Code2, FlaskRound, Table2, DoorOpen, MousePointerClick, CircleDot, Disc3, LayoutTemplate, PanelTop, Pentagon, type LucideIcon } from 'lucide-react';
 import { ScenePanel } from '@renderer/panels/ScenePanel';
 import { InspectorPanel } from '@renderer/panels/InspectorPanel';
 import { MaterialsPanel } from '@renderer/panels/MaterialsPanel';
@@ -18,6 +18,7 @@ import { SuspensionPanel } from '@renderer/suspension/SuspensionPanel';
 import { PowertrainPanel } from '@renderer/powertrain/PowertrainPanel';
 import { ConfigsPanel } from '@renderer/configs/ConfigsPanel';
 import { FeaturesPanel } from '@renderer/features/FeaturesPanel';
+import { SoundPanel } from '@renderer/sound/SoundPanel';
 import { PaintsPanel } from '@renderer/paint/PaintsPanel';
 import { ScriptsPanel } from '@renderer/scripts/ScriptsPanel';
 import { ScriptPanel } from '@renderer/scripts/ScriptPanel';
@@ -58,6 +59,7 @@ export const PANELS = {
   reference: { title: 'Reference car', icon: CarFront, component: ReferencePanel },
   suspension: { title: 'Suspension', icon: Wrench, component: SuspensionPanel },
   powertrain: { title: 'Engine & gearbox', icon: Gauge, component: PowertrainPanel },
+  sound: { title: 'Sound', icon: Volume2, component: SoundPanel },
   configs: { title: 'Configurations', icon: ListTree, component: ConfigsPanel },
   features: { title: 'Extras', icon: BadgePlus, component: FeaturesPanel },
   paints: { title: 'Paints', icon: PaintRoller, component: PaintsPanel },

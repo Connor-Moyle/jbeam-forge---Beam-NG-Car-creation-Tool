@@ -194,8 +194,8 @@ export const MIGRATIONS: readonly Migration[] = [
   },
   {
     from: 25,
-    // Nothing to change: a fitted suspension's own track is new and optional (without it, the axle's track doesn't stretch the set).
-    describe: 'the track of a fitted suspension, so the axle’s track can widen or narrow it',
+    // Nothing to change: a fitted suspension's own track and the car's sounds are new and optional.
+    describe: 'the track of a fitted suspension, so the axle’s track can widen or narrow it; the car’s sounds',
     migrate: (doc) => ({ ...doc, formatVersion: 26 }),
   },
 ];

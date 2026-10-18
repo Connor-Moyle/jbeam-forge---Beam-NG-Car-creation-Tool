@@ -132,13 +132,15 @@ const slotTypes = new Set([...parts.values(), ...gameParts.values()].flatMap((p)
 const partsBySlot = new Map<string, string[]>();
 for (const [name, p] of parts) for (const st of slotTypesOf(p)) partsBySlot.set(st, [...(partsBySlot.get(st) ?? []), name]);
 // Filled by the game's own common parts (every stock car declares them), and meshes from vehicles/common.
-const GAME_SLOT_TYPES = new Set(['paint_design', 'skin_glass', 'licenseplate_design_2_1']);
+const GAME_SLOT_TYPES = new Set(['paint_design', 'skin_glass', 'licenseplate_design_2_1', 'soundscape_horn']);
+/** Parts the game's vehicles/common has (its horns: soundscape_horn_1…). */
+const gamePart = (name: string) => /^soundscape_horn_\d+$/.test(name);
 const GAME_MESHES = new Set(['licenseplate', 'towhitch', 'n2o_bottle_10lb', 'n2o_bottle_20lb']);
 for (const [name, p] of parts) {
   for (const r of slotRows(p)) {
     // An optional slot with nothing to fit stays empty in the game (an ETK-only power steering slot on a borrowed suspension): worth knowing, not broken.
     for (const t of r.allow) if (!slotTypes.has(t) && !GAME_SLOT_TYPES.has(t)) (r.def ? errors : warnings).push(`${name}: slot ${r.name} allows "${t}" but no part has that slotType${r.def ? '' : ', so it stays empty'}`);
-    if (r.def && !partOf(r.def)) errors.push(`${name}: slot ${r.name} defaults to missing part ${r.def}`);
+    if (r.def && !partOf(r.def) && !gamePart(r.def)) errors.push(`${name}: slot ${r.name} defaults to missing part ${r.def}`);
   }
 }
 
@@ -156,7 +158,7 @@ while (queue.length) {
     const choice = pc.parts[slot] ?? r.def;
     if (!choice) continue;
     if (!partOf(choice)) {
-      errors.push(`default.pc: slot ${slot} → missing part ${choice}`);
+      if (!gamePart(choice)) errors.push(`default.pc: slot ${slot} → missing part ${choice}`);
       continue;
     }
     // A part fits a slot by the slot's allowTypes (slots2), or by its name (the older slots table).

@@ -3,8 +3,8 @@ import type { ProxyMode } from './build';
 
 /**
  * Beam presets, attachment styles and per-kind proxy defaults. Values are
- * the measured medians in docs/proxy-generation.md (official Sunburst,
- * BeamNG 0.39.1) — re-measure with `npm run study-structure` before changing.
+ * the medians of each part kind over the game's 38 cars (BeamNG 0.39,
+ * docs/structure-study.md) — re-measure with scripts/dev/study-all-cars.mts before changing.
  */
 
 export type BeamPresetId = (typeof BEAM_PRESETS)[number];
@@ -27,14 +27,17 @@ export interface BeamPreset extends BeamValues {
 }
 
 export const BEAM_PRESET_VALUES: Record<BeamPresetId, BeamPreset> = {
-  structure_stiff: { label: 'Stiff structure', beamSpring: 3_000_000, beamDamp: 130, beamDeform: 9_000, beamStrength: 50_000, nodeWeight: 3.5, nodeMaterial: '|NM_METAL', braceSpringFactor: 0.6 },
-  panel_metal: { label: 'Metal panel', beamSpring: 800_000, beamDamp: 70, beamDeform: 8_000, beamStrength: 55_000, nodeWeight: 0.9, nodeMaterial: '|NM_METAL', braceSpringFactor: 0.5 },
-  panel_plastic: { label: 'Plastic panel', beamSpring: 200_000, beamDamp: 60, beamDeform: 7_000, beamStrength: 50_000, nodeWeight: 0.6, nodeMaterial: '|NM_PLASTIC', braceSpringFactor: 0.5 },
-  trim_light: { label: 'Light trim', beamSpring: 300_000, beamDamp: 30, beamDeform: 4_000, beamStrength: 12_000, nodeWeight: 0.3, nodeMaterial: '|NM_PLASTIC', braceSpringFactor: 0.5 },
-  glass_brittle: { label: 'Glass', beamSpring: 300_000, beamDamp: 250, beamDeform: 3_500, beamStrength: 3_500, nodeWeight: 1.6, nodeMaterial: '|NM_GLASS', braceSpringFactor: 0.5 },
-  mechanical: { label: 'Mechanical', beamSpring: 4_000_000, beamDamp: 150, beamDeform: 25_000, beamStrength: 275_000, nodeWeight: 4.5, nodeMaterial: '|NM_METAL', braceSpringFactor: 0.7 },
-  mechanical_light: { label: 'Light mechanical', beamSpring: 300_000, beamDamp: 70, beamDeform: 6_000, beamStrength: 15_000, nodeWeight: 1, nodeMaterial: '|NM_METAL', braceSpringFactor: 0.6 },
-  mechanical_block: { label: 'Mechanical block', beamSpring: 15_000_000, beamDamp: 500, beamDeform: 175_000, beamStrength: null, nodeWeight: 15, nodeMaterial: '|NM_METAL', braceSpringFactor: 0.8 },
+  structure_stiff: { label: 'Stiff structure', beamSpring: 2_500_000, beamDamp: 125, beamDeform: 11_000, beamStrength: 150_000, nodeWeight: 3, nodeMaterial: '|NM_METAL', braceSpringFactor: 0.6 },
+  panel_metal: { label: 'Metal panel', beamSpring: 700_000, beamDamp: 60, beamDeform: 7_000, beamStrength: 65_000, nodeWeight: 0.9, nodeMaterial: '|NM_METAL', braceSpringFactor: 0.5 },
+  // Stiffness stays at the old values where the game's would be higher: our generated nodes are
+  // lighter than the game's (a thin skirt's weigh 0.15 kg, a steering wheel's 0.5 kg), and at the
+  // game's 400k–1.5M those parts blew up at spawn in the 2000 Hz check. Deform and strength are the game's.
+  panel_plastic: { label: 'Plastic panel', beamSpring: 200_000, beamDamp: 60, beamDeform: 8_000, beamStrength: 55_000, nodeWeight: 0.6, nodeMaterial: '|NM_PLASTIC', braceSpringFactor: 0.5 },
+  trim_light: { label: 'Light trim', beamSpring: 600_000, beamDamp: 50, beamDeform: 8_000, beamStrength: 55_000, nodeWeight: 0.6, nodeMaterial: '|NM_PLASTIC', braceSpringFactor: 0.5 },
+  glass_brittle: { label: 'Glass', beamSpring: 250_000, beamDamp: 50, beamDeform: 4_000, beamStrength: 6_000, nodeWeight: 1.2, nodeMaterial: '|NM_GLASS', braceSpringFactor: 0.5 },
+  mechanical: { label: 'Mechanical', beamSpring: 5_000_000, beamDamp: 140, beamDeform: 60_000, beamStrength: 350_000, nodeWeight: 4.5, nodeMaterial: '|NM_METAL', braceSpringFactor: 0.7 },
+  mechanical_light: { label: 'Light mechanical', beamSpring: 300_000, beamDamp: 70, beamDeform: 15_000, beamStrength: 40_000, nodeWeight: 1, nodeMaterial: '|NM_METAL', braceSpringFactor: 0.6 },
+  mechanical_block: { label: 'Mechanical block', beamSpring: 6_000_000, beamDamp: 400, beamDeform: 175_000, beamStrength: null, nodeWeight: 15, nodeMaterial: '|NM_METAL', braceSpringFactor: 0.8 },
   tyre_rubber: { label: 'Tyre rubber', beamSpring: 50_000, beamDamp: 10, beamDeform: 20_000, beamStrength: null, nodeWeight: 0.5, nodeMaterial: '|NM_RUBBER', braceSpringFactor: 0.5 },
 };
 
@@ -80,11 +83,11 @@ const CYLINDERS = new Set(['driveshaft', 'halfshaft', 'axle', 'lower_arm', 'uppe
 const HULLS = new Set(['hub', 'knuckle', 'brake_disc', 'brake_caliper', 'brake_drum', 'radiator', 'intercooler', 'oil_cooler', 'fuel_tank', 'nitrous', 'battery', 'washer_tank', 'intake', 'turbo', 'supercharger', 'engine_mount', 'steering_rack', 'muffler', 'wheel', 'spare_wheel', 'shifter', 'pedals', 'handbrake', 'steering_wheel', 'seat', 'rear_seat', 'tow_hitch', 'tow_hook']);
 
 /**
- * Node budgets of the panels the game's cars all build alike, measured over eight of them (Pessima,
- * Covet, ETK 800, Sunburst, Bastion, Vivace, LeGran, Wendover): a door has 15 or 16 nodes, a hood 21
- * to 24, a boot lid 14 to 18, a wing 9 to 13. The middle of each range is that count.
+ * Node budgets of the panels the game's cars all build alike, measured over all 38 of them
+ * (docs/structure-study.md): a door has 15 or 16 nodes, a hood 13 (up to 27), a boot lid 10 (up
+ * to 20), a wing 10 (up to 20), a roof 10 (up to 22). The middle of each range is that count.
  */
-const PANEL_BUDGETS: Record<string, [number, number]> = { door: [10, 20], hood: [14, 28], trunk: [12, 24], tailgate: [12, 24], fender: [8, 16], quarter_panel: [8, 16], roof: [10, 20] };
+const PANEL_BUDGETS: Record<string, [number, number]> = { door: [10, 20], hood: [12, 26], trunk: [10, 20], tailgate: [10, 20], fender: [8, 18], quarter_panel: [8, 18], roof: [10, 22] };
 
 /** Proxy mode, budget, bracing and attachment defaults for a part kind (user-overridable per part). */
 export function kindDefaults(entry: TaxonomyEntry): KindDefaults {

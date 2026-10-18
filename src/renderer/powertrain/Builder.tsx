@@ -69,7 +69,7 @@ function defaultRange(f: EditableField, value: number): { min: number; max: numb
  * made adjustable in the game's tuning menu, and each part can have the modder's own versions (a
  * race radiator) with their own values. Outside advanced mode only the usual settings show.
  */
-function FieldList({ kind, fields, edits, hide }: { kind: PowertrainKind; fields: readonly EditableField[]; edits: Readonly<Record<string, number>>; hide?: ReadonlySet<string> }) {
+export function FieldList({ kind, fields, edits, hide, title }: { kind: PowertrainKind; fields: readonly EditableField[]; edits: Readonly<Record<string, number>>; hide?: ReadonlySet<string>; title?: string }) {
   const [filter, setFilter] = useState('');
   const advanced = useSettingsStore((s) => s.settings?.advancedMode ?? false);
   const fitted = useProjectStore((s) => s.doc?.powertrain[kind] ?? null);
@@ -86,7 +86,7 @@ function FieldList({ kind, fields, edits, hide }: { kind: PowertrainKind; fields
   const hidden = matching.length - shown.length;
   const parts = [...new Set(matching.map((f) => f.part))];
   return (
-    <FieldGroup title={`Everything else the game lets you set (${fields.length})`}>
+    <FieldGroup title={title ?? `Everything else the game lets you set (${fields.length})`}>
       <Input placeholder="Filter: rpm, boost, radiator, sound, shift…" value={filter} onChange={(e) => setFilter(e.target.value)} aria-label="Filter settings" />
       {hidden > 0 && <p className={styles.muted}>{hidden} more in advanced mode (Settings → General), or type in the filter to find one.</p>}
       {parts.map((part) => {

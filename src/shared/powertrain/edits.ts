@@ -19,6 +19,8 @@ export const fieldKey = (part: string, section: string, key: string) => `${part}
 
 /** Weight of every node in the set, as a multiplier (1 = the game's). */
 export const MASS_SCALE = '@massScale';
+/** A gearbox's whine, as a multiplier on its gearWhineCoefs (1 = the game's, 0 = silent). */
+export const GEAR_WHINE = '@gearWhine';
 
 export interface EditableField {
   key: string;
@@ -296,7 +298,7 @@ export function applyPowertrainEdits(parts: Readonly<Record<string, JbeamObject>
     return out[part]![section] as JbeamObject;
   };
   for (const [key, value] of Object.entries(edits.fields)) {
-    if (key === MASS_SCALE) continue;
+    if (key === MASS_SCALE || key === GEAR_WHINE) continue;
     const [part, section, name] = key.split('/');
     if (!part || !section || !name) continue;
     if (typeof parts[part]?.[section] !== 'object' || typeof (parts[part][section] as JbeamObject)[name] !== 'number') continue;
@@ -321,6 +323,19 @@ export function applyPowertrainEdits(parts: Readonly<Record<string, JbeamObject>
     const p = ratiosPart(parts, root);
     const sec = p ? touch(p, 'gearbox') : null;
     if (sec) sec.gearRatios = edits.gearRatios.map(r4);
+  }
+  const whine = edits.fields[GEAR_WHINE];
+  if (typeof whine === 'number' && whine >= 0 && whine !== 1) {
+    for (const [name, body] of Object.entries(out)) {
+      for (const section of ['gearbox', 'transfercase', 'differential'] as const) {
+        const sec = body[section];
+        if (!isJbeamObject(sec)) continue;
+        for (const coefs of ['gearWhineCoefsInput', 'gearWhineCoefsOutput'] as const) {
+          if (!Array.isArray(sec[coefs])) continue;
+          touch(name, section)![coefs] = sec[coefs].map((c) => (typeof c === 'number' ? r4(c * whine) : c));
+        }
+      }
+    }
   }
   const k = edits.fields[MASS_SCALE];
   if (typeof k === 'number' && k > 0 && k !== 1) {

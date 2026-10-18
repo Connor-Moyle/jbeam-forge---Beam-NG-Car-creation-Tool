@@ -319,6 +319,10 @@ export interface InvokeContract {
   'beamng:soundSamples': { req: { name: string }; res: { path: string; rpm: number; load: number }[] };
   /** One sample file's bytes (null when the install doesn't have it). */
   'beamng:soundFile': { req: { path: string }; res: Uint8Array | null };
+  /** The game's horns (soundscape_horn parts), for the Sound tab. */
+  'beamng:horns': { req: undefined; res: { part: string; label: string }[] };
+  /** Pick the user's own engine recordings (ogg, wav, flac); their folder is granted for the export's copy. */
+  'dialog:pickAudioFiles': { req: undefined; res: string[] };
   /** Material names in the game's vehicle zips (fork), for using a stock material by name. */
   'beamng:gameMaterials': { req: undefined; res: { name: string; vehicle: string; paint: boolean }[] };
   /** What the game's log says about a car's last load and spawn (null: no log, or no user folder set). */
@@ -429,6 +433,8 @@ export const INVOKE_CHANNELS = [
   'beamng:engineSounds',
   'beamng:soundSamples',
   'beamng:soundFile',
+  'beamng:horns',
+  'dialog:pickAudioFiles',
   'dialog:pickDirectory',
   'import:pickSource',
   'tutorial:demoModel',

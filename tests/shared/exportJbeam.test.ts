@@ -307,7 +307,7 @@ describe('jbeam export', () => {
     expect(readTable(body.refNodes!).header).toEqual(['ref:', 'back:', 'left:', 'up:', 'leftCorner:', 'rightCorner:']);
     expect(body.cameraExternal).toBeTruthy();
     // Body declares the bumper and badge slots (and the hood, its taxonomy child).
-    expect(readTable(body.slots2!).records.map((r) => r.values.name).sort()).toEqual(['test_badge_R', 'test_bumper_F', 'test_hood']);
+    expect(readTable(body.slots2!).records.map((r) => r.values.name).sort()).toEqual(['soundscape_horn', 'test_badge_R', 'test_bumper_F', 'test_hood']);
     // Race bumper: same slot, same node group name, its own nodes.
     const race = files.get('test_bumper_F_race')!;
     expect(race.slotType).toBe('test_bumper_F');

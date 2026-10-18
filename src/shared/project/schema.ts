@@ -591,6 +591,32 @@ export const SkinSchema = z.object({
  * The game's extras (v15, Phase 12d): licence plates (the game's own plate
  * mesh, placed on a part), a tow hitch, nitrous, and paint designs.
  */
+/** An engine sound blend of the mod's own (v26): a game blend moved in pitch, or the user's own recordings. */
+export const SoundBlendSchema = z.object({
+  id: z.string().min(1),
+  /** Letters, digits and underscores: the mod's file is named after it. */
+  name: z.string().min(1),
+  /** A copy of this game blend (null: made from the user's own recordings). */
+  base: z.string().nullable(),
+  /** Every sample's rpm multiplied by this (1: as recorded). */
+  rpmScale: z.number().positive(),
+  /** The user's recordings: absolute paths, each at the rpm it was recorded. */
+  samples: z.array(z.object({ file: z.string().min(1), rpm: z.number().positive(), load: z.number().min(0).max(1) })),
+});
+
+/** The car's sounds (v26): what the Sound tab sets. Everything is written into the mod's own files only. */
+export const SoundSchema = z.object({
+  /** How much the cabin muffles the outside, 0 (open) to 1; null: the game's default. */
+  cabinFilterCoef: z.number().min(0).max(1).nullable(),
+  /** One of the game's horns (soundscape_horn_N); null: the stock default. */
+  horn: z.string().nullable(),
+  /** Latch recordings for the hinged parts (modern_03…); null: the stock set. */
+  latch: z.object({ door: z.string().nullable(), hood: z.string().nullable(), trunk: z.string().nullable() }),
+  blends: z.array(SoundBlendSchema),
+});
+
+export const emptySound = (): z.infer<typeof SoundSchema> => ({ cabinFilterCoef: null, horn: null, latch: { door: null, hood: null, trunk: null }, blends: [] });
+
 export const FeaturesSchema = z.object({
   plates: z.object({
     /** tilt: degrees about the car's left–right axis. */
@@ -600,6 +626,8 @@ export const FeaturesSchema = z.object({
   hitch: Mount.nullable(),
   nitrous: Mount.extend({ bottle: z.enum(['10lb', '20lb']), shotKw: z.number().positive() }).nullable(),
   skins: z.array(SkinSchema),
+  /** The car's sounds (v26). */
+  sound: SoundSchema.optional(),
 });
 
 export const ProjectV18Schema = z.object({
@@ -703,7 +731,7 @@ export const ProjectV25Schema = ProjectV24Schema.extend({
   formatVersion: z.literal(25),
 });
 
-/** v26: a fitted suspension's own track (axle.fitted.track), so the axle's track can widen or narrow it on export. */
+/** v26: a fitted suspension's own track (axle.fitted.track), so the axle's track can widen or narrow it on export; the car's sounds (features.sound). */
 export const ProjectV26Schema = ProjectV25Schema.extend({
   formatVersion: z.literal(26),
 });
@@ -724,6 +752,8 @@ export type FittedSet = z.infer<typeof FittedSetSchema>;
 export type TuningVar = z.infer<typeof TuningVarSchema>;
 export type VehicleConfig = z.infer<typeof VehicleConfigSchema>;
 export type Features = z.infer<typeof FeaturesSchema>;
+export type Sound = z.infer<typeof SoundSchema>;
+export type SoundBlend = z.infer<typeof SoundBlendSchema>;
 export type Skin = z.infer<typeof SkinSchema>;
 export type Paint = z.infer<typeof PaintSchema>;
 export type VinylLayer = z.infer<typeof VinylLayerSchema>;

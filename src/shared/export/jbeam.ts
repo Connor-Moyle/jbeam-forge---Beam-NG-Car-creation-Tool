@@ -22,6 +22,7 @@ import type { PartScripts } from '../lua/export';
 import { applyDrivetrainToAxle, applyDrivetrainToGearbox, DEFAULT_DRIVETRAIN, planDrivetrain } from '../powertrain/drivetrain';
 import { camerasInternalSection } from '../cameras/cameras';
 import { applyChoices, type SetChoices, type SetOptions } from '../suspension/options';
+import { latchEvents, latchKindOf, resolveBlendTexts } from '../sound/blend';
 import { buildFeatureParts } from './features';
 import { applyPowertrainEdits } from '../powertrain/edits';
 import { engineRevRange, fitShiftingToEngine, type RevRange } from '../powertrain/shiftFit';
@@ -554,9 +555,11 @@ export function buildJbeamFiles(fullDoc: Doc, tax: TaxonomyLookup, opts: JbeamEx
   let gearboxParts: Record<string, JbeamObject> | null = null;
   // Every engine that can sit in front of the gearbox (the default and the alternates).
   const engineRevs: RevRange[] = [];
+  // The mod's own engine sounds: their sampleName marks become the blends' names in the mod.
+  const withBlends = (edits: PowertrainEdits | undefined) => (edits?.texts ? { ...edits, texts: resolveBlendTexts(edits.texts, slug, fullDoc.features?.sound?.blends ?? []) } : edits);
   if (pt?.engine) {
     const tags = engineTags(pt);
-    const t = bring(pt.engine.setId, pt.engine.sourceId, tags.get(pt.engine.sourceId) ?? 'E', mountNodes, pt.engine.tuning, rewritesFor(pt.engine.setId).rewrites, pt.engine.edits, pt.engine.choices, undefined, gearboxNodes);
+    const t = bring(pt.engine.setId, pt.engine.sourceId, tags.get(pt.engine.sourceId) ?? 'E', mountNodes, pt.engine.tuning, rewritesFor(pt.engine.setId).rewrites, withBlends(pt.engine.edits), pt.engine.choices, undefined, gearboxNodes);
     if (t) {
       // One engine slot name whichever engine is the default (engines from different cars name theirs differently), so configurations keep working.
       const engineSlot = engineSlotType(slug);
@@ -594,7 +597,7 @@ export function buildJbeamFiles(fullDoc: Doc, tax: TaxonomyLookup, opts: JbeamEx
       }
       // The other engines fill the same slot: the player (or a configuration) picks one.
       for (const alt of pt.alternates ?? []) {
-        const a = bring(alt.setId, alt.sourceId, tags.get(alt.sourceId) ?? 'E2', mountNodes, alt.tuning, rewritesFor(alt.setId).rewrites, alt.edits, alt.choices, undefined, rewritesFor(alt.setId).slots.length ? gearboxNodes : undefined);
+        const a = bring(alt.setId, alt.sourceId, tags.get(alt.sourceId) ?? 'E2', mountNodes, alt.tuning, rewritesFor(alt.setId).rewrites, withBlends(alt.edits), alt.choices, undefined, rewritesFor(alt.setId).slots.length ? gearboxNodes : undefined);
         if (a) setSlot(a.rootPart, a.parts[a.rootPart]);
         const altRange = a ? engineRevRange(Object.values(a.parts)) : null;
         if (altRange) engineRevs.push(altRange);
@@ -783,6 +786,7 @@ export function buildJbeamFiles(fullDoc: Doc, tax: TaxonomyLookup, opts: JbeamEx
     const featureSlots = doc.parts.filter((p) => slotTypeOf(doc.parts, p) === slotType).flatMap((p) => fx.partSlots.get(p.id) ?? []);
     const moreSlots = [...(part.id === body?.id ? extraSlots : []), ...featureSlots];
     if (moreSlots.length) content.slots2 = [...((content.slots2 as WritableValue[] | undefined) ?? [['name', 'allowTypes', 'denyTypes', 'default', 'description']]), ...moreSlots];
+    if (part.id === body?.id) Object.assign(content, fx.bodySections);
     if (part.id === body?.id && doc.proxy.refNodes) {
       const r = doc.proxy.refNodes;
       content.refNodes = [['ref:', 'back:', 'left:', 'up:', 'leftCorner:', 'rightCorner:'], [r.ref, r.back, r.left, r.up, r.leftCorner, r.rightCorner]];
@@ -924,6 +928,8 @@ function hingeSections(doc: Doc, part: Part, hinge: Hinge, nodes: readonly Struc
   const ids = hingeIds(doc, part.id);
   const out: Record<string, WritableValue> = {};
   const coupler = couplerFor(hinge.action);
+  const kind = latchKindOf(part.taxonomyId);
+  const latch = latchEvents(kind, doc.features?.sound?.latch[kind]);
   if (ids.latchPart && ids.latchBody) {
     out.controller = [['fileName'], ['advancedCouplerControl', { name: coupler }]];
     out[coupler] = {
@@ -935,8 +941,8 @@ function hingeSections(doc: Doc, part: Part, hinge: Hinge, nodes: readonly Struc
       attachSoundVolume: 1,
       detachSoundVolume: 1,
       'soundNode:': [ids.latchPart],
-      attachSoundEvent: 'event:>Vehicle>Latches>Door>modern_06_close',
-      detachSoundEvent: 'event:>Vehicle>Latches>Door>modern_06_open',
+      attachSoundEvent: latch.attach,
+      detachSoundEvent: latch.detach,
       breakSoundEvent: '',
       openForceMagnitude: openForce(hinge, nodes),
       openForceDuration: 0.45,

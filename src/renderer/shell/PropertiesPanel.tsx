@@ -17,6 +17,7 @@ const TAB_HINTS: Record<PropertyTab, string> = {
   skins: 'Skin studio: liveries players can pick in game',
   suspension: "Suspension: axles, and suspensions from the game's cars",
   powertrain: 'Engine and gearbox',
+  sound: 'Sound: the engine’s voice and mix, gear whine, horn, latches and cabin, all in the mod’s own files',
   configs: 'Configurations: versions of the car and their parts (.pc)',
   features: 'Extras: licence plates, tow hitch, nitrous, paint designs',
   objects: 'Objects library: calipers, discs, gauges…',

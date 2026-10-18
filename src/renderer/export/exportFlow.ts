@@ -38,6 +38,7 @@ import { setWheels, wheelNames, wheelSlotEnds } from '@shared/suspension/wheels'
 import { archWarning, nodesFoulingTyres } from '@shared/suspension/arch';
 import { suspensionLoadWarning } from '@shared/suspension/load';
 import { jbeamMaterialRefs } from '@shared/export/materialRefs';
+import { blendExportName, blendFileText, blendSamplePath, pitchSamples, type BlendSample } from '@shared/sound/blend';
 import { blockBounds } from '@shared/powertrain/placement';
 import { engineFit, engineFitWarning } from '@shared/powertrain/fit';
 import { budgetWarnings } from '@shared/export/budgets';
@@ -537,12 +538,30 @@ export async function finalBundle(prepared: PreparedExport['bundle'], progress: 
       return figures && f.text !== undefined ? { ...f, text: withMeasured(f.text, figures) } : f;
     });
   }
+  // The mod's own engine sounds: a blend file each, named after the mod, with the recordings it
+  // plays (a game blend's, moved in pitch, or the user's own, copied into the mod's sound folder).
+  const extraCopies: { from: string; to: string }[] = [];
+  const sound = projectStore.getState().doc?.features.sound;
+  if (slug && sound?.blends.length) {
+    for (const b of sound.blends) {
+      let samples: BlendSample[] = [];
+      if (b.base) samples = pitchSamples(await call('beamng:soundSamples', { name: b.base }).catch((): BlendSample[] => []), b.rpmScale);
+      else
+        for (const s of b.samples) {
+          const to = blendSamplePath(slug, s.file);
+          if (!extraCopies.some((c) => c.to === to)) extraCopies.push({ from: s.file, to });
+          samples.push({ path: to, rpm: Math.round(s.rpm * b.rpmScale), load: s.load });
+        }
+      if (samples.length) bundle.files = [...bundle.files, { path: `art/sound/blends/${blendExportName(slug, b)}.sfxBlend2D.json`, text: blendFileText(samples) }];
+      else logger.warn(`engine sound ${b.name} has no recordings and was left out`);
+    }
+  }
   const todo = bundle.copies.filter((c) => c.convert);
-  if (!todo.length) return { ...bundle, copies: bundle.copies.map(({ from, to }) => ({ from, to })) };
+  if (!todo.length) return { ...bundle, copies: [...bundle.copies.map(({ from, to }) => ({ from, to })), ...extraCopies] };
   const s = useSettingsStore.getState().settings;
   const opts = { mipmaps: s?.ddsMipmaps ?? true, normalFormat: s?.ddsNormalFormat ?? 'BC3', maxSize: s?.ddsMaxSize ?? 0 } as const;
   const files = [...bundle.files];
-  const copies: { from: string; to: string }[] = bundle.copies.filter((c) => !c.convert).map(({ from, to }) => ({ from, to }));
+  const copies: { from: string; to: string }[] = [...bundle.copies.filter((c) => !c.convert).map(({ from, to }) => ({ from, to })), ...extraCopies];
   const renamed = new Map<string, string>();
   let n = 0;
   for (const c of todo) {

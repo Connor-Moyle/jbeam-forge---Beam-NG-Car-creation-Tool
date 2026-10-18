@@ -48,6 +48,7 @@ Every finished phase ships as a Windows installer and a portable exe on GitHub R
 | Version | Contents |
 |---|---|
 | 0.6.0 | Phases 1–6 plus the grouped scene tree |
+| 0.17.0 | Track width works (the axle's Track stretches a fitted game suspension sideways on export; format v26); structure presets re-measured over all 38 of the game's cars (`docs/structure-study.md`): body three times stronger, trim stiff like the game's, glass damping 25, engine blocks 6M; a Sound tab (engine voice from the game's sounds or the mod's own pitched copies and recordings, engine mix, gear whine, horn, latch recordings, cabin muffling), all written into the mod's own files; every mod now has a horn |
 | 0.15.1 | Game suspensions front and rear: generated firewall and rear window nodes no longer share names with the game's wheel hubs (and older projects are stopped at export); only axles with their own differential are driven, dangling wheel shafts dropped |
 | 0.15.0 | Blender-style layout: a Properties column with a tab per tool (Inspector, materials, paints, skins, suspension, engine, configurations, extras, objects, reference) instead of ten toolbar panel buttons; a header on the 3D view for what it draws; labelled Generate, Test, Configurations and Export; Parts and Suspension workspaces; output panels under the view; Properties side, toolbar words and opening workspace in Settings; exports with a game engine and gearbox fitted, engine mods installed into the car's folder, part mods exportable from the toolbar, all checked against a real install |
 | 0.14.1 | Exported cars spawn in the game (beams eased for the 2000 Hz physics step); parts held all round (glass in its frame, no pivoting on one edge or one parent node); a fitted game suspension puts the car's wheels and brakes on its hubs and they ride on the game's wheel; Generate options (proxy mode and detail), convex hull by default; pickers refresh after a library scan; viewport keys where the mouse is |
@@ -694,6 +695,18 @@ Decisions recorded with you:
 
 **Next:** Phase 7: editing suite, focus mode, and category-grouped part slots.
 
+
+### 0.17.0 — Track width, presets from every car, the Sound tab (done 2026-10-18)
+
+**Delivered**
+- **Track width.** The axle's Track field was stored but never used. Fitting a game suspension now records the set's own track (`axle.fitted.track`, format v26) and sets the axle's to match; a different Track stretches the set sideways about the centre line on export (`transplantSuspension({ lateral })`): hub, arm and wheel-slot x positions, formulas included. The viewport still shows the set at its own width. The own-meshes button is always clickable (it was greyed out until a mesh was selected, which read as missing).
+- **Presets from all 38 cars.** `scripts/dev/study-all-cars.mts` reads every drivable car in the install and prints medians per part kind; `docs/structure-study.md` has the table. `BEAM_PRESET_VALUES` and the panel budgets are set from it (see the doc for what moved and why).
+- **Sound tab** (`src/renderer/sound/`, `src/shared/sound/blend.ts`): the engine's voice (any game blend, or a blend of the mod's own: a pitched copy of a game blend, or the user's recordings), the engine mix (sound-related numbers of the fitted engine through the builder's edits), gear whine (`@gearWhine` scales the gearbox's whine coefficients), horn (the game's `soundscape_horn` parts, listed from common.zip), latch recordings per door/hood/boot, and cabin muffling. Blends are written to `art/sound/blends/<slug>_<name>.sfxBlend2D.json`, recordings copied to `art/sound/<slug>/`; both namespaced by the mod, so no game file is ever touched. The writer allows only those paths.
+- **Every mod has a horn.** The body carried no `soundscape_horn` slot, so exported cars were mute on the horn. The slot is now on the body, stock horn by default.
+
+**Verification:** `npm run regress` (typecheck, lint, unit tests, desktop harness, exported mod lint). Not driven in the game this round.
+
+**Next:** the viewport drawing a stretched suspension at the axle's track; the latch and horn checked in the game.
 
 ### Phase 1 — Foundations (done 2026-09-26)
 

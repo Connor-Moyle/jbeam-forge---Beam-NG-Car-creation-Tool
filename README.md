@@ -364,9 +364,18 @@ You can mix both approaches. A per-corner checklist shows what's from your mesh 
 
 **Meshes and variants.** Every component can have its own mesh. Make "Turbo Stage 1/2/3" as variants, each with its own specs *and* its own turbo mesh, and they're all selectable in-game.
 
-**Engine sound.** Pick from the game's own engine sounds with a filterable list.
+**Engine sound.** Pick from the game's own engine sounds with a filterable list, or go to the Sound tab for the mix and your own recordings.
 
 The sandbox doesn't simulate the powertrain, so the dyno chart is your preview there.
+
+### Sound
+The **Sound** tab is the car's mixing desk. Everything it sets is written into the mod's own files: the game's sounds are read, never changed.
+
+- **Engine voice.** Which recordings the intake and the exhaust play: any of the game's engine sounds, or one of your own (below). Play it and sweep the revs to hear it in the app.
+- **My engine sounds.** A sound of the mod's own: a **pitched copy** of a game sound (above 1 it sounds bigger and lazier, below 1 smaller and revvier), or a sound made **from your recordings** (ogg, wav or flac, each a steady note at the revs in its file name, on or off throttle). Pitched copies need a game sound with recordings; the newer synthesized ones can only be mixed.
+- **Engine mix.** The engine's own sound numbers: intake and exhaust volume, on- and off-load volume, muffling, bass and treble, EQ, backfires, and the turbo's whine, hiss and blow-off. Each can be left adjustable in the game's tuning menu.
+- **Gear whine.** Louder or quieter than the game's gearbox, down to silent.
+- **Car.** The horn (any of the game's, and the player can swap it in the parts menu), the latch recordings for doors, hood and boot, and how much the cabin muffles the outside.
 
 ### Cameras and animated props
 **Cameras.** Driver, passenger, bonnet, roof, front and rear bumper, or custom. Click to place, set the field of view, and preview the view from that camera without leaving the app.

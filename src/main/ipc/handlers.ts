@@ -21,7 +21,8 @@ import { gameMaterialDefinitions, scanGameMaterials } from '../beamng/gameMateri
 import { vehicleLogReport } from '@shared/beamng/logReport';
 import { measuredFigures } from '@shared/export/performance';
 import { vehicleClashes } from '../export/clashes';
-import { engineSoundSamples, readSoundFile, scanEngineSounds } from '../beamng/engineSounds';
+import { engineSoundSamples, readSoundFile, scanEngineSounds, scanHorns } from '../beamng/engineSounds';
+import { AUDIO_EXTENSIONS } from '@shared/sound/blend';
 import type { SetOptions } from '@shared/suspension/options';
 import { collectDiagnostics, copyDiagnosticsToClipboard } from '../diagnostics';
 import { pickDirectory, pickOpenFile, pickOpenFiles, pickSaveFile, queueHarnessDialogAnswers } from '../dialogs';
@@ -274,6 +275,15 @@ export function registerIpcHandlers(services: HandlerServices): void {
   registerInvoke('beamng:engineSounds', async () => {
     const dir = installDir();
     return dir ? (await scanEngineSounds(dir)).map((s) => ({ name: s.name })) : [];
+  });
+  registerInvoke('beamng:horns', async () => {
+    const dir = installDir();
+    return dir ? scanHorns(dir) : [];
+  });
+  registerInvoke('dialog:pickAudioFiles', async (_req, event) => {
+    const paths = await pickOpenFiles(event.sender, { title: 'Your engine recordings', filters: [{ name: 'Recordings', extensions: AUDIO_EXTENSIONS.map((e) => e.slice(1)) }], properties: ['openFile', 'multiSelections'] });
+    for (const p of paths) projects.grantFile(p); // the export copies them into the mod
+    return paths;
   });
   registerInvoke(
     'beamng:soundSamples',

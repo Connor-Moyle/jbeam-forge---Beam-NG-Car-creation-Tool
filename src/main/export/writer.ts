@@ -4,6 +4,7 @@ import { dirname, extname, join, posix } from 'node:path';
 import { ZipFile } from 'yazl';
 import { SLUG_PATTERN } from '@shared/project/schema';
 import { IMAGE_EXTENSIONS } from '../import/textures';
+import { AUDIO_EXTENSIONS } from '@shared/sound/blend';
 
 /**
  * Writes an exported mod (SPEC §4.15) either as an **unpacked mod** in
@@ -56,17 +57,21 @@ export function checkBundle(bundle: ModBundle, canReadSource: (path: string) => 
   // car it fits, always under a name of this mod's own, so no game file is ever replaced.
   const commonRoot = `vehicles/common/${bundle.slug}/`;
   const besideCar = new RegExp(`^vehicles/[a-z0-9_]+/${bundle.slug}_[A-Za-z0-9_]+\\.jbeam$`);
+  // The mod's own engine sounds: blends named after the mod, and its recordings in a folder of the mod's own.
+  const soundRoot = `art/sound/${bundle.slug}/`;
+  const blendFile = new RegExp(`^art/sound/blends/${bundle.slug}_[A-Za-z0-9_]+\\.sfxBlend2D\\.json$`);
   const check = (p: string) => {
     const norm = posix.normalize(p.replace(/\\/g, '/'));
     const inLua = norm.startsWith(luaRoot) && norm.endsWith('.lua');
-    const allowed = norm.startsWith(root) || norm.startsWith(commonRoot) || besideCar.test(norm) || inLua;
+    const allowed = norm.startsWith(root) || norm.startsWith(commonRoot) || besideCar.test(norm) || inLua || norm.startsWith(soundRoot) || blendFile.test(norm);
     if (norm !== p || !allowed || norm.includes('..') || posix.isAbsolute(norm)) throw new ExportError(`Refusing to write outside ${root}: ${p}`);
   };
   for (const f of bundle.files) check(f.path);
   for (const c of bundle.copies) {
     check(c.to);
-    if (!(IMAGE_EXTENSIONS as readonly string[]).includes(extname(c.from).toLowerCase())) throw new ExportError(`Only textures can be copied into a mod: ${c.from}`);
-    if (!canReadSource(c.from)) throw new ExportError(`Texture is outside every folder you have opened or located: ${c.from}`);
+    const audio = c.to.startsWith(soundRoot) && (AUDIO_EXTENSIONS as readonly string[]).includes(extname(c.from).toLowerCase());
+    if (!audio && !(IMAGE_EXTENSIONS as readonly string[]).includes(extname(c.from).toLowerCase())) throw new ExportError(`Only textures and recordings can be copied into a mod: ${c.from}`);
+    if (!canReadSource(c.from)) throw new ExportError(`${audio ? 'Recording' : 'Texture'} is outside every folder you have opened or located: ${c.from}`);
   }
 }
 

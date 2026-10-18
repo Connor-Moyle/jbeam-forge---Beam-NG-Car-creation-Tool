@@ -3,7 +3,7 @@
  * a tool that works on the car or the picked part. Kept apart from the panel
  * registry so the column can read the registry without a circular import.
  */
-export const PROPERTY_TABS = ['inspector', 'materials', 'paints', 'skins', 'suspension', 'powertrain', 'configs', 'features', 'objects', 'reference'] as const;
+export const PROPERTY_TABS = ['inspector', 'materials', 'paints', 'skins', 'suspension', 'powertrain', 'sound', 'configs', 'features', 'objects', 'reference'] as const;
 
 export type PropertyTab = (typeof PROPERTY_TABS)[number];
 
@@ -24,6 +24,7 @@ export const PROPERTY_TAB_WIDTH: Record<PropertyTab, Width> = {
   skins: 'size-props-wide',
   suspension: 'size-props-wide',
   powertrain: 'size-props-xl',
+  sound: 'size-props-wide',
   configs: 'size-props-wide',
   features: 'size-props-wide',
   objects: 'size-props-wide',

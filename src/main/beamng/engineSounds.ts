@@ -131,3 +131,35 @@ export async function readSoundFile(installDir: string, path: string): Promise<U
   }
   return null;
 }
+
+export interface Horn {
+  /** The part name (soundscape_horn_12). */
+  part: string;
+  /** Its name in the parts menu ("Horn 12 (1988 Pessima)"). */
+  label: string;
+}
+
+/** The game's horns: every soundscape_horn part in the install's vehicles/common zip. */
+export async function scanHorns(installDir: string): Promise<Horn[]> {
+  const out: Horn[] = [];
+  for (const zip of await zipsOf(installDir)) {
+    if (!zip.toLowerCase().endsWith('common.zip')) continue;
+    try {
+      await withZip(zip, async (z) => {
+        for (const e of await z.entries()) {
+          if (!/vehicles\/common\/sounds\/[^/]+\.jbeam$/i.test(e.name)) continue;
+          const { value } = parseJbeam(await z.readText(e.name, 4 * 1024 * 1024));
+          if (!isJbeamObject(value)) continue;
+          for (const [part, body] of Object.entries(value)) {
+            if (!/^soundscape_horn_\d+$/.test(part) || !isJbeamObject(body)) continue;
+            const info = body.information;
+            out.push({ part, label: isJbeamObject(info) && typeof info.name === 'string' ? info.name : part });
+          }
+        }
+      });
+    } catch {
+      // unreadable zip: skip
+    }
+  }
+  return out.sort((a, b) => Number(a.part.slice(16)) - Number(b.part.slice(16)));
+}
