@@ -43,8 +43,15 @@ for (const [cat, name] of [
   writeFileSync(join(d, 'mesh.dae'), DAE);
 }
 
+{
+  const d = join(packs, 'scripts', 'Harness', 'Harness Blinker');
+  mkdirSync(d, { recursive: true });
+  writeFileSync(join(d, 'script.jbscript'), JSON.stringify({ format: 'jbforge-script', version: 1, name: 'harness_blinker', label: 'Harness Blinker', description: 'A harness script.', category: 'Harness', templateId: null, params: {}, code: '-- nothing' }));
+}
+
 await buildContentRepo(join(packs, 'materials'), join(dir, 'repos', 'textures'), 'textures', '2.0.0');
 await buildContentRepo(join(packs, 'objects'), join(dir, 'repos', 'meshes'), 'meshes', '2.0.0');
+await buildContentRepo(join(packs, 'scripts'), join(dir, 'repos', 'scripts'), 'scripts', '2.0.0');
 
 // Releases: one newer than the app, the app's own, and one older (to roll back to).
 const [maj, min] = current.split('.').map(Number) as [number, number];

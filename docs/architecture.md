@@ -65,6 +65,7 @@ Presets (`Parts` (id `modelling`), `Modelling` (id `model`), `Materials`, `Testi
 - `npm run lint`: ESLint (type-checked, react-hooks as errors, selector rule) + token lint.
 - `npm run typecheck`: node and web tsconfigs.
 - `npm run run-desktop`: builds, then drives the real app via Playwright's Electron driver. It uses an isolated temp userData and screenshots to `artifacts/run-desktop/<timestamp>/`. It fails on any unexpected console error or `[error]` line in `main.log`. Deliberate crashes carry the `[harness-triggered]` marker. Hooks are exposed on `window.__jbforgeTest` only in dev/harness runs.
+- `node scripts/run-desktop.mjs --only=press-all` (asked for by name; about 15 minutes, so not part of `regress`): presses every button, dropdown option, checkbox and radio in every workspace of the practice car and in every window they open, answers native pickers with "cancel", and fails on any error, hang or window that won't close. `press-all.json` in the run's folder lists what was pressed where.
 
 ## Ground truth (SPEC §3.1, Phase 2)
 

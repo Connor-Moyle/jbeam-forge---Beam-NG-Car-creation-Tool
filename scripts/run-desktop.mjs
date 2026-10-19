@@ -84,7 +84,7 @@ const ghServer = createServer((req, res) => {
   if (/^\/api\/repos\/[^/]+\/jbeam-forge\/releases$/.test(url.pathname)) return send(200, readFileSync(join(fakeGh, 'releases.json'), 'utf8').replaceAll('ASSETS/', `${base}/assets/`));
   // One content repository, a folder per kind (Connor-Moyle/jbeam-forge-content/textures …).
   if (/^\/api\/repos\/[^/]+\/jbeam-forge-content\/tags$/.test(url.pathname)) return send(200, JSON.stringify([{ name: 'v2.0.0' }, { name: 'v1.0.0' }]));
-  if ((m = /^\/raw\/[^/]+\/jbeam-forge-content\/[^/]+\/(textures|meshes)\/(.+)$/.exec(url.pathname))) {
+  if ((m = /^\/raw\/[^/]+\/jbeam-forge-content\/[^/]+\/(textures|meshes|scripts)\/(.+)$/.exec(url.pathname))) {
     const file = join(fakeGh, 'repos', m[1], ...decodeURIComponent(m[2]).split('/'));
     return existsSync(file) ? send(200, readFileSync(file), 'application/octet-stream') : send(404, 'not found', 'text/plain');
   }
@@ -147,6 +147,25 @@ function assert(cond, msg) {
 
 async function openPanels(page) {
   return (await hook(page, 'openPanels')).sort();
+}
+
+/** The practice car from the home screen, sorted into parts and generated: what the audit and press-all scenarios start from. */
+async function openPractice(page) {
+  await page.waitForSelector('[data-testid=app-ready]');
+  if (await page.locator('[data-view=editor]').count()) {
+    await hook(page, 'runCommand', 'close');
+    if (await page.getByTestId('unsaved-discard').isVisible({ timeout: 1500 }).catch(() => false)) await page.getByTestId('unsaved-discard').click();
+  }
+  await page.waitForSelector('[data-view=home][data-testid=app-ready]');
+  await page.getByTestId('home-tour').click();
+  await page.waitForSelector('[data-testid=tour-card]');
+  await page.getByRole('button', { name: 'Skip the tutorial' }).click();
+  for (let i = 0; i < 300 && !((await hook(page, 'sceneStats')).meshes > 40); i++) await page.waitForTimeout(100);
+  await hook(page, 'applyPreset', 'modelling'); // the Scene panel (a scenario before may have left another workspace)
+  await page.getByTestId('scene-classify').click();
+  await page.getByTestId('classify-apply').click();
+  await page.getByTestId('toolbar-generate').click();
+  for (let i = 0; i < 1800 && !((await hook(page, 'projectDoc')).nodes.length > 50); i++) await page.waitForTimeout(100);
 }
 
 
@@ -4108,21 +4127,7 @@ const scenarios = [
     id: 'audit',
     name: 'audit on the practice car: every workspace, every toolbar button and every key; nothing errors and the window keeps answering',
     async run({ page }) {
-      await page.waitForSelector('[data-testid=app-ready]');
-      if (await page.locator('[data-view=editor]').count()) {
-        await hook(page, 'runCommand', 'close');
-        if (await page.getByTestId('unsaved-discard').isVisible({ timeout: 1500 }).catch(() => false)) await page.getByTestId('unsaved-discard').click();
-      }
-      await page.waitForSelector('[data-view=home][data-testid=app-ready]');
-      await page.getByTestId('home-tour').click();
-      await page.waitForSelector('[data-testid=tour-card]');
-      await page.getByRole('button', { name: 'Skip the tutorial' }).click();
-      for (let i = 0; i < 300 && !((await hook(page, 'sceneStats')).meshes > 40); i++) await page.waitForTimeout(100);
-      await hook(page, 'applyPreset', 'modelling'); // the Scene panel (a scenario before may have left another workspace)
-      await page.getByTestId('scene-classify').click();
-      await page.getByTestId('classify-apply').click();
-      await page.getByTestId('toolbar-generate').click();
-      for (let i = 0; i < 1800 && !((await hook(page, 'projectDoc')).nodes.length > 50); i++) await page.waitForTimeout(100);
+      await openPractice(page);
       const problems = [];
       const closeAll = async () => {
         for (let i = 0; i < 4 && (await page.locator('[role=dialog]').count()); i++) {
@@ -4222,6 +4227,213 @@ const scenarios = [
       await shot(page, 'audit-end');
       assert(!problems.length, `no problems:\n  ${problems.join('\n  ')}`);
       assert(nodes1 === nodes0, `undo puts the structure back (${nodes0} → ${nodes1})`);
+    },
+  },
+  {
+    id: 'press-all',
+    name: 'press-all: every button, select option, checkbox and radio in every workspace of the practice car, and in every window they open; nothing errors, nothing hangs',
+    skip: () => !only?.includes('press-all'), // a quarter of an hour: run when asked for by name
+    async run({ page }) {
+      await openPractice(page);
+      const problems = [];
+      const pressed = {}; // workspace → the controls pressed there
+      // Not pressed: what leaves the car (its own scenarios press it), reaches outside the machine (a release
+      // update, a push to GitHub, an AI service), takes minutes (an AO bake), or would hide what is still to
+      // press (the workspace tabs and panel toggles are this scenario's and the audit's own loop, a panel's ×
+      // is its toggle, a window's Close is Escape).
+      const SKIP = /^(update-run|publish-push|publish-clone|ai-send|material-bake-ao|unsaved-|newmod-create|workspace-|toggle-|Close( |$))/;
+      const done = new Set(); // across workspaces: the toolbar and the windows it opens are the same everywhere
+      const seenOn = new Set();
+      let shots = 0;
+      const failed = async (what, e) => {
+        const lines = e.message.split('\n');
+        problems.push(`${what}: ${[lines[0], ...lines.filter((l) => /intercepts pointer|not visible|outside of the viewport|detached|disabled/.test(l)).slice(0, 2)].join(' ')}`);
+        if (shots++ < 8) await shot(page, `press-all-problem-${shots}`);
+      };
+      const closeAll = async () => {
+        for (let i = 0; i < 4 && (await page.locator('[role=dialog]').count()); i++) {
+          await page.keyboard.press('Escape');
+          await page.waitForTimeout(150);
+        }
+      };
+      const check = async (what) => {
+        const errs = consoleErrors.length;
+        const t0 = Date.now();
+        await page.evaluate(() => new Promise((r) => requestAnimationFrame(() => r(1))));
+        const ms = Date.now() - t0;
+        if (ms > 3000) problems.push(`${what}: the window took ${ms} ms to answer`);
+        const cards = await page.locator('[data-testid=error-card]').count();
+        if (cards) problems.push(`${what}: ${cards} panel error card(s)`);
+        if (!(await page.locator('[data-testid=app-ready]').count())) problems.push(`${what}: the app is no longer ready`);
+        for (const e of consoleErrors.slice(errs)) if (!e.includes(MARKER)) problems.push(`${what}: console error ${e.slice(0, 200)}`);
+      };
+      const BUTTONS = 'button:visible:not([role=combobox]), [role=button]:visible';
+      const keysOf = (scope) => scope.locator(BUTTONS).evaluateAll((els) => els.map((el) => ({ key: el.getAttribute('data-testid') || el.getAttribute('aria-label') || el.textContent.trim().replace(/\s+/g, ' ').slice(0, 40) || el.className, off: el.disabled || el.getAttribute('aria-disabled') === 'true', tab: el.getAttribute('role') === 'tab' })));
+      /**
+       * Everything pressable inside `scope` (the page, or one window), each once: buttons first (a collapsed
+       * section is opened again so its contents get their turn; a button busy with the one before gets a few
+       * seconds to free up), then every option of every dropdown and select, every checkbox on and off, every
+       * radio. A window a button opens is pressed through the same way, then closed. Returns false when a
+       * press closed the window itself.
+       */
+      const crawl = async (scope, tag, depth = 0) => {
+        const list = (pressed[tag] ??= []);
+        const id = (k) => (depth ? `${tag} › ${k}` : k); // a window's Cancel is that window's
+        for (let round = 0; round < 400; round++) {
+          let keys = await keysOf(scope);
+          for (const k of keys) if (!k.off) seenOn.add(id(k.key));
+          // A tab goes last: what the current tab shows is pressed before the next tab hides it.
+          const next = (ks) => {
+            const open = ks.findIndex((k) => !k.tab && !done.has(id(k.key)) && !SKIP.test(k.key));
+            return open >= 0 ? open : ks.findIndex((k) => !done.has(id(k.key)) && !SKIP.test(k.key));
+          };
+          let i = next(keys);
+          if (i < 0) break;
+          // Disabled: a few seconds to free up when it was enabled before (busy with the press before); otherwise it stays so.
+          for (let w = 0; w < 30 && keys[i].off && seenOn.has(id(keys[i].key)); w++) {
+            await page.waitForTimeout(500);
+            keys = await keysOf(scope);
+            i = next(keys);
+            if (i < 0) break;
+          }
+          if (i < 0) break;
+          const key = keys[i].key;
+          done.add(id(key));
+          if (keys[i].off) {
+            list.push(`${key} (disabled)`);
+            continue;
+          }
+          const what = `${tag} › ${key}`;
+          const btn = scope.locator(BUTTONS).nth(i);
+          const dialogsBefore = await page.locator('[role=dialog]').count();
+          const pressedBefore = await btn.getAttribute('aria-pressed').catch(() => null);
+          await hook(page, 'queueDialog', [null]); // a native picker gets "cancel"
+          const clicked = await btn.click({ timeout: 4000, noWaitAfter: true }).then(() => true, (e) => (failed(`${what}: could not be pressed`, e), false));
+          if (!clicked) continue;
+          list.push(key);
+          await page.waitForTimeout(250);
+          // A collapsed section is opened again, a toggle put back (view toggles would hide the car for every press after).
+          if ((await btn.getAttribute('aria-expanded').catch(() => null)) === 'false') await btn.click({ timeout: 2000 }).catch(() => undefined);
+          if (pressedBefore !== null && (await btn.getAttribute('aria-pressed').catch(() => null)) !== pressedBefore) await btn.click({ timeout: 2000 }).catch(() => undefined);
+          // Test mode started: stopped again, or it blocks editing and costs every press after it.
+          if (key !== 'toolbar-test' && (await page.getByTestId('toolbar-test').textContent().catch(() => '')) === 'Stop test') await page.getByTestId('toolbar-test').click().catch(() => undefined);
+          await check(what);
+          if (!(await page.locator('[data-view=editor]').count())) {
+            problems.push(`${what}: left the editor`);
+            return false;
+          }
+          const dialogs = await page.locator('[role=dialog]').count();
+          if (depth > 0 && dialogs < dialogsBefore) return false;
+          if (dialogs > dialogsBefore) {
+            if (depth === 0) {
+              await crawl(page.locator('[role=dialog]').last(), `${tag} › ${key}`, 1);
+              await closeAll();
+              if (await page.locator('[role=dialog]').count()) problems.push(`${what}: Escape did not close the window it opened`);
+            } else {
+              await page.keyboard.press('Escape');
+              await page.waitForTimeout(150);
+            }
+          }
+          if (depth > 0 && !(await scope.isVisible().catch(() => false))) return false;
+        }
+        if ((await page.getByTestId('toolbar-test').textContent().catch(() => '')) === 'Stop test') await page.getByTestId('toolbar-test').click().catch(() => undefined);
+        // Dropdowns (the Select component): opened, each option picked in turn, the first choice put back.
+        const combos = await scope.locator('[role=combobox]:visible:enabled').evaluateAll((els) => els.map((e) => ({ key: e.getAttribute('data-testid') || e.getAttribute('aria-label') || e.id, value: e.textContent.trim() })));
+        for (let c = 0; c < combos.length; c++) {
+          const { key, value } = combos[c];
+          if (done.has(id(key))) continue;
+          done.add(id(key));
+          // Found again by its name each time: a choice can change the panel around it (or take it away: a mesh's "Animate as" becomes its animation).
+          const combo = () => (key ? scope.locator(`[role=combobox]:visible:enabled[data-testid="${key}"], [role=combobox]:visible:enabled[aria-label="${key}"]`).first() : scope.locator('[role=combobox]:visible:enabled').nth(c));
+          let n = 0;
+          for (let o = 0; o < 40; o++) {
+            if (!(await combo().count())) {
+              list.push(`${key} (gone after option ${o - 1})`);
+              break;
+            }
+            await combo().click({ timeout: 5000 }).catch((e) => failed(`${tag} › ${key}: could not be opened`, e));
+            await page.waitForTimeout(150);
+            const options = page.locator('[data-radix-popper-content-wrapper] [role=option]:visible'); // the open list's (the Materials panel lists materials as options too)
+            n = await options.count();
+            if (o >= n) {
+              await page.keyboard.press('Escape');
+              break;
+            }
+            const picked = await options.nth(o).click({ timeout: 2000 }).then(() => true, (e) => (failed(`${tag} › ${key} option ${o}`, e), false));
+            if (!picked) {
+              await page.keyboard.press('Escape');
+              break; // the list is not usable: one problem says so, the other options would say the same
+            }
+            await page.waitForTimeout(150);
+            await check(`${tag} › ${key} option ${o}`);
+          }
+          await combo().click({ timeout: 2000 }).catch(() => undefined);
+          await page.locator('[data-radix-popper-content-wrapper] [role=option]:visible', { hasText: value }).first().click({ timeout: 1000 }).catch(() => page.keyboard.press('Escape'));
+          list.push(`${key} (${n} options)`);
+        }
+        const selects = await scope.locator('select:visible:enabled').evaluateAll((els) => els.map((e) => ({ key: e.getAttribute('data-testid') || e.getAttribute('aria-label') || e.name || e.id, n: e.options.length, value: e.value })));
+        for (let s = 0; s < selects.length; s++) {
+          const { key, n, value } = selects[s];
+          const sel = scope.locator('select:visible:enabled').nth(s);
+          for (let o = 0; o < n; o++) {
+            await sel.selectOption({ index: o }, { timeout: 2000 }).catch((e) => problems.push(`${tag} › ${key} option ${o}: ${e.message.split('\n')[0]}`));
+            await page.waitForTimeout(150);
+            await check(`${tag} › ${key} option ${o}`);
+          }
+          await sel.selectOption(value, { timeout: 2000 }).catch(() => undefined);
+          list.push(`${key} (${n} options)`);
+        }
+        const boxes = await scope.locator('input[type=checkbox]:visible:enabled').count();
+        for (let b = 0; b < boxes; b++) {
+          const box = scope.locator('input[type=checkbox]:visible:enabled').nth(b);
+          const key = (await box.getAttribute('data-testid').catch(() => null)) || (await box.getAttribute('aria-label').catch(() => null)) || `checkbox ${b}`;
+          for (let k = 0; k < 2; k++) {
+            await box.click({ timeout: 2000 }).catch((e) => problems.push(`${tag} › ${key}: ${e.message.split('\n')[0]}`));
+            await page.waitForTimeout(150);
+            await check(`${tag} › ${key}`);
+          }
+          list.push(`${key} (checkbox)`);
+        }
+        const radios = await scope.locator('input[type=radio]:visible:enabled').count();
+        for (let r = 0; r < radios; r++) {
+          const radio = scope.locator('input[type=radio]:visible:enabled').nth(r);
+          const key = (await radio.getAttribute('aria-label').catch(() => null)) || (await radio.getAttribute('value').catch(() => null)) || `radio ${r}`;
+          await radio.click({ timeout: 2000 }).catch((e) => problems.push(`${tag} › ${key}: ${e.message.split('\n')[0]}`));
+          await page.waitForTimeout(150);
+          await check(`${tag} › radio ${key}`);
+          list.push(`${key} (radio)`);
+        }
+        return true;
+      };
+      const workspaces = await page.locator('[data-testid^=workspace-]').evaluateAll((els) => els.map((e) => e.getAttribute('data-testid')));
+      const timing = {};
+      for (const ws of workspaces) {
+        const t0 = Date.now();
+        await page.getByTestId(ws).click();
+        await page.waitForTimeout(700);
+        await closeAll();
+        if (!(await crawl(page, ws))) await openPractice(page);
+        await shot(page, `press-all-${ws}`);
+        timing[ws] = Date.now() - t0;
+      }
+      // Edit mode's own toolbar, with every node selected so each tool has something to work on.
+      await page.getByTestId('workspace-jbeam').click().catch(() => undefined);
+      await page.waitForTimeout(500);
+      if (!(await hook(page, 'editState')).active) await page.getByTestId('toolbar-edit').click(); // the JBeam workspace turns it on by itself
+      for (let i = 0; i < 20 && !(await hook(page, 'editState')).active; i++) await page.waitForTimeout(100);
+      if ((await hook(page, 'editState')).active) {
+        await page.locator('[data-testid=viewport]').hover();
+        await page.keyboard.press('Control+A');
+        await page.waitForTimeout(200);
+        await crawl(page.locator('[data-testid=edit-toolbar]'), 'edit-mode', 1);
+        if ((await hook(page, 'editState')).active) await page.getByTestId('edit-exit').click().catch(() => undefined);
+      } else problems.push(`edit-mode: Edit nodes did not enter edit mode (button pressed=${await page.getByTestId('toolbar-edit').getAttribute('aria-pressed')}, workspace ${await hook(page, 'preset')}, ${(await hook(page, 'projectDoc')).nodes.length} nodes)`);
+      await hook(page, 'queueDialog', []); // the "cancel" answers no picker took
+      await shot(page, 'press-all-end');
+      const total = Object.values(pressed).reduce((n, l) => n + l.length, 0);
+      writeFileSync(join(outDir, 'press-all.json'), JSON.stringify({ total, problems, timing, pressed }, null, 1));
+      console.log(`press-all: ${total} controls pressed in ${Object.keys(pressed).length} places, ${problems.length} problem(s); ${JSON.stringify(timing)}`);
+      assert(!problems.length, `no problems:\n  ${problems.join('\n  ')}`);
     },
   },
   {

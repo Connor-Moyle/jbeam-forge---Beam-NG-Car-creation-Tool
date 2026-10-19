@@ -9,7 +9,9 @@ import { BrowserWindow, dialog, type OpenDialogOptions, type SaveDialogOptions, 
  */
 const harnessQueue: (string | null)[] = [];
 
+/** An empty list clears what is queued (a scenario that answered "cancel" ahead of every click it made). */
 export function queueHarnessDialogAnswers(answers: (string | null)[]): void {
+  if (!answers.length) harnessQueue.length = 0;
   harnessQueue.push(...answers);
 }
 
