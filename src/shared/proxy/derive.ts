@@ -369,6 +369,9 @@ const SPREAD = 0.7;
 /** At least this many parent nodes take a part's attachments (when that many are in reach), this far apart (m). */
 const MIN_ANCHORS = 4;
 const MIN_ANCHOR_SPACING = 0.05;
+/** A shear brace from a held node: at least this long (m) and this far (rad) off every tie it already has. */
+const BRACE_MIN_LENGTH = 0.2;
+const BRACE_ANGLE = Math.PI / 6;
 
 /** Thinner than this (m) across its least direction, a part is flat. */
 const FLAT = 0.04;
@@ -417,6 +420,11 @@ export interface AttachOptions {
   /** Every node within this of an attached node (m): small for glass, held all round its frame. */
   span?: number;
   maxBeams?: number;
+  /**
+   * Nodes of rigid relatives (a sibling roof or cage, the grandparent) a far node may hold on to when
+   * the parent alone leaves the part pivoting about a line: a windscreen on a tub holds its top on the roof.
+   */
+  relatives?: readonly StructNode[];
 }
 
 /**
@@ -433,13 +441,20 @@ export function attachToParent(child: readonly StructNode[], parent: readonly St
   const span = isFlat(child) ? 0 : (options.span ?? ATTACH_SPAN);
   const maxBeams = options.maxBeams ?? 150;
   const d = (a: StructNode, b: StructNode) => Math.hypot(a.pos[0] - b.pos[0], a.pos[1] - b.pos[1], a.pos[2] - b.pos[2]);
-  const nearestDist = child.map((c) => Math.min(...parent.map((p) => d(c, p))));
+  const parentDist = child.map((c) => Math.min(...parent.map((p) => d(c, p))));
+  const relatives = options.relatives ?? [];
+  const relDist = child.map((c) => (relatives.length ? Math.min(...relatives.map((r) => d(c, r))) : Infinity));
+  // What each node can hold on to: the parent where it reaches, else a rigid relative (a roof over a windscreen's top).
+  const nearestDist = child.map((_, i) => Math.min(parentDist[i]!, relDist[i]!));
   const sorted = [...nearestDist].sort((x, y) => x - y);
   // Nodes within reach of the parent (≤ 0.22 m, as the game attaches most of a panel's nodes; or 1.5× the closest gap when the part sits slightly off),
   // at least 3. A part far from its parent (> FAR_FROM_PARENT) only hangs on its 3 nearest nodes.
   const gap = sorted[0] ?? 0;
   const far = gap > FAR_FROM_PARENT;
   const reach = far ? -1 : Math.max(0.22, gap * 1.5);
+  const coverLimit = Math.max(MAX_COVER_LENGTH, gap * 1.5);
+  /** The nodes a child node ties to: its parent's when in reach, else the relatives'. */
+  const poolOf = (i: number) => (parentDist[i]! <= coverLimit || !relatives.length ? parent : relatives);
   const chosen = new Set<number>();
   child.forEach((_, i) => {
     if (nearestDist[i]! <= reach) chosen.add(i);
@@ -447,7 +462,6 @@ export function attachToParent(child: readonly StructNode[], parent: readonly St
   if (chosen.size < 3) for (const i of child.map((_, i) => i).sort((a, b) => nearestDist[a]! - nearestDist[b]!).slice(0, 3)) chosen.add(i);
   // Cover the whole part: the node furthest from every attached one is attached next, while the parent is in reach.
   if (!far) {
-    const coverLimit = Math.max(MAX_COVER_LENGTH, gap * 1.5);
     const fromChosen = child.map((c) => Math.min(...[...chosen].map((j) => d(c, child[j]!))));
     for (let guard = 0; guard < child.length; guard++) {
       let pick = -1;
@@ -457,11 +471,11 @@ export function attachToParent(child: readonly StructNode[], parent: readonly St
       for (let i = 0; i < child.length; i++) fromChosen[i] = Math.min(fromChosen[i]!, d(child[i]!, child[pick]!));
     }
   }
-  // Spread: along the part's two main directions, the attachments must span most of the part, or it
-  // pivots about the line they make (a grille held only along its bottom row tips forward).
+  // Spread: along each of the part's directions, the attachments must span most of the part, or it
+  // pivots about the line they make (a grille held only along its bottom row tips forward; a cage held
+  // at its feet leans, so its height counts too).
   if (!far && child.length > 3) {
-    const coverLimit = Math.max(MAX_COVER_LENGTH, gap * 1.5);
-    for (const axis of principalAxes(child).slice(0, 2)) {
+    for (const axis of principalAxes(child)) {
       const proj = child.map((c) => c.pos[0] * axis[0] + c.pos[1] * axis[1] + c.pos[2] * axis[2]);
       const lo = Math.min(...proj);
       const hi = Math.max(...proj);
@@ -474,11 +488,11 @@ export function attachToParent(child: readonly StructNode[], parent: readonly St
         // The node furthest outside the attached range, at the side with the most left uncovered.
         const below = hlo - lo;
         const above = hi - hhi;
+        const outside = (i: number) => (below >= above ? hlo - proj[i]! : proj[i]! - hhi);
         let pick = -1;
         for (let i = 0; i < child.length; i++) {
           if (chosen.has(i) || nearestDist[i]! > coverLimit) continue;
-          const out = below >= above ? hlo - proj[i]! : proj[i]! - hhi;
-          if (out > 0 && (pick < 0 || out > (below >= above ? hlo - proj[pick]! : proj[pick]! - hhi))) pick = i;
+          if (outside(i) > 0 && (pick < 0 || outside(i) > outside(pick))) pick = i;
         }
         if (pick < 0) break;
         chosen.add(pick);
@@ -491,7 +505,7 @@ export function attachToParent(child: readonly StructNode[], parent: readonly St
   for (const i of [...chosen].sort((a, b) => nearestDist[a]! - nearestDist[b]!)) {
     const c = child[i]!;
     // A beam of a few millimetres has no clear direction and shakes in the game: nodes that close are skipped.
-    const nearest = [...parent].filter((x) => d(c, x) >= MIN_ATTACH_LENGTH).sort((x, y) => d(c, x) - d(c, y)).slice(0, links);
+    const nearest = [...poolOf(i)].filter((x) => d(c, x) >= MIN_ATTACH_LENGTH).sort((x, y) => d(c, x) - d(c, y)).slice(0, links);
     for (const p of nearest) {
       const key = `${c.id}|${p.id}`;
       if (seen.has(key)) continue;
@@ -500,10 +514,37 @@ export function attachToParent(child: readonly StructNode[], parent: readonly St
       if (out.length >= maxBeams) return out;
     }
   }
+  // Shear: a node's nearest ties all run much the same way (along the sill under a cage's foot), and a tall
+  // part leans on them without stretching one. One brace per held node, to a node well off that line.
+  if (!far) {
+    const unit = (c: StructNode, p: StructNode) => {
+      const L = d(c, p) || 1;
+      return [(p.pos[0] - c.pos[0]) / L, (p.pos[1] - c.pos[1]) / L, (p.pos[2] - c.pos[2]) / L];
+    };
+    for (const i of chosen) {
+      const c = child[i]!;
+      const pool = poolOf(i);
+      const ties = out.filter((b) => b.id1 === c.id).map((b) => pool.find((p) => p.id === b.id2)).filter((p): p is StructNode => !!p);
+      if (!ties.length || out.length >= maxBeams) continue;
+      const dirs = ties.map((p) => unit(c, p));
+      let best: StructNode | null = null;
+      let bestAngle = 0;
+      for (const p of pool) {
+        const L = d(c, p);
+        if (L < BRACE_MIN_LENGTH || L > coverLimit || seen.has(`${c.id}|${p.id}`)) continue;
+        const u = unit(c, p);
+        const angle = Math.acos(Math.min(1, Math.max(...dirs.map((v) => Math.abs(u[0]! * v[0]! + u[1]! * v[1]! + u[2]! * v[2]!)))));
+        if (angle > bestAngle) [best, bestAngle] = [p, angle];
+      }
+      if (best && bestAngle >= BRACE_ANGLE) {
+        seen.add(`${c.id}|${best.id}`);
+        out.push({ id1: c.id, id2: best.id, partId, kind: 'attach' });
+      }
+    }
+  }
   // The parent's side spread too: when every beam lands on the same one or two parent nodes the part
   // pivots there like a ball joint (a mirror on a door). More anchors, as far apart as reach allows.
   if (!far) {
-    const coverLimit = Math.max(MAX_COVER_LENGTH, gap * 1.5);
     const held = [...chosen].map((i) => child[i]!);
     const anchors = new Set(out.map((b) => b.id2));
     const anchorNodes = () => parent.filter((p) => anchors.has(p.id));

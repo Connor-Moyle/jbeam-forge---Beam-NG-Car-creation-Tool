@@ -115,7 +115,8 @@ export function standNodes(s: Solver): number[] {
       if (picked.includes(i) || s.model.mass[i] === 0) continue;
       const z = s.x[i * 3 + 2]!;
       if (z > lo[2]! + 0.4 * H) continue; // low nodes only (sills, floor)
-      const d = Math.hypot(s.x[i * 3]! - tx, s.x[i * 3 + 1]! - ty) + (z - lo[2]!) * 0.5;
+      // A sill or floor node, not a diffuser's or skirt's featherweight one (a stand under 0.3 kg lifts nothing).
+      const d = Math.hypot(s.x[i * 3]! - tx, s.x[i * 3 + 1]! - ty) + (z - lo[2]!) * 0.5 + (s.model.mass[i]! < 1 ? 0.5 : 0);
       if (d < bd) {
         bd = d;
         best = i;
@@ -132,9 +133,11 @@ export function settle(model: SimModel, seconds = 2, supports: 'stands' | 'groun
   placeOnGround(s, supports === 'stands' ? 0.3 : 0.005);
   if (supports === 'stands') {
     for (const node of standNodes(s)) {
-      // Stiff enough to carry the car, soft enough to stay stable at 2000 Hz for light nodes.
+      // Stiff enough to carry the car, soft enough to stay stable at 2000 Hz for light nodes; the damping
+      // scales with the node too (4000 on a 0.3 kg node is itself unstable at this step: c·Δt/m > 2).
       const m = model.mass[node]!;
-      s.anchors.push({ node, point: [s.x[node * 3]!, s.x[node * 3 + 1]!, s.x[node * 3 + 2]!], stiffness: Math.min(5e6, 2e6 * Math.max(0.5, m)), damping: 4000 });
+      const stiffness = Math.min(5e6, 2e6 * Math.max(0.5, m));
+      s.anchors.push({ node, point: [s.x[node * 3]!, s.x[node * 3 + 1]!, s.x[node * 3 + 2]!], stiffness, damping: Math.min(4000, Math.sqrt(stiffness * m)) });
     }
   }
   const start = Float64Array.from(s.x);
@@ -362,10 +365,24 @@ function swingFrame(h: HingeSpec) {
 
 const at = (s: Solver, i: number): V => [s.x[i * 3]!, s.x[i * 3 + 1]!, s.x[i * 3 + 2]!];
 
+/** The model with one part's latch let go (its beams slackened), as the game does when the door is opened. */
+function unlatched(model: SimModel, partId: string): SimModel {
+  const mine = (model.latches ?? []).filter((k) => model.beamPart[k] === partId);
+  if (!mine.length) return model;
+  const spring = Float64Array.from(model.spring);
+  const damp = Float64Array.from(model.damp);
+  for (const k of mine) spring[k] = damp[k] = 0;
+  return { ...model, spring, damp };
+}
+
 /** Hold everything but the hinged part where it is (a test rig), with no ground in the way. */
 function rig(model: SimModel, own: ReadonlySet<number>): Solver {
   const s = new Solver(model, { groundZ: -1e6 });
-  for (let i = 0; i < s.n; i++) if (!own.has(i) && model.mass[i]! > 0) s.anchors.push({ node: i, point: at(s, i), stiffness: Math.min(5e6, 2e6 * Math.max(0.5, model.mass[i]!)), damping: 4000 });
+  for (let i = 0; i < s.n; i++) {
+    if (own.has(i) || !(model.mass[i]! > 0)) continue;
+    const stiffness = Math.min(5e6, 2e6 * Math.max(0.5, model.mass[i]!));
+    s.anchors.push({ node: i, point: at(s, i), stiffness, damping: Math.min(4000, Math.sqrt(stiffness * model.mass[i]!)) });
+  }
   return s;
 }
 
@@ -375,7 +392,8 @@ function rig(model: SimModel, own: ReadonlySet<number>): Solver {
  * freely, the limiter stops it near its opening angle, it closes back onto its
  * seals, and nothing breaks.
  */
-export function hingeSwing(model: SimModel, h: HingeSpec, seconds = 3): ScenarioResult {
+export function hingeSwing(latchedModel: SimModel, h: HingeSpec, seconds = 3): ScenarioResult {
+  const model = unlatched(latchedModel, h.partId);
   const ownList = ownNodes(model, h.partId);
   const own = new Set(ownList);
   const s = rig(model, own);
@@ -428,7 +446,8 @@ export function hingeSwing(model: SimModel, h: HingeSpec, seconds = 3): Scenario
  * rising to four times the hinge strength. Good behaviour: it tears off at the
  * hinges, near the set strength, before its own skin rips.
  */
-export function hingeYank(model: SimModel, h: HingeSpec, seconds = 1.5): ScenarioResult {
+export function hingeYank(latchedModel: SimModel, h: HingeSpec, seconds = 1.5): ScenarioResult {
+  const model = unlatched(latchedModel, h.partId);
   const ownList = ownNodes(model, h.partId);
   const own = new Set(ownList);
   const s = rig(model, own);

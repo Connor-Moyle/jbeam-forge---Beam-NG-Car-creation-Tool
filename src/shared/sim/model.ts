@@ -4,6 +4,8 @@ import { materialDefaults } from '../parts/materials';
 import { partSettings } from '../proxy/generate';
 import { beamPhysics } from '../proxy/beamValues';
 import { limiterBound } from '../hinges/geometry';
+import { hingeIds } from '../hinges/build';
+import type { StructBeam } from '../project/schema';
 import { STABILITY_DT, STABILITY_OK, STABILITY_UNSTABLE } from '../proxy/derive';
 import type { SimModel } from './solver';
 import { stabilise } from '../proxy/stability';
@@ -41,7 +43,16 @@ export function buildSimModel(doc: Doc, tax: TaxonomyLookup, parts: readonly Par
     mass[i] = node.weight;
   });
 
-  const beams = doc.beams.filter((b) => include.has(b.partId) && index.has(b.id1) && index.has(b.id2));
+  const own = doc.beams.filter((b) => include.has(b.partId) && index.has(b.id1) && index.has(b.id2));
+  // Latches: the game's coupler holds each auto-latching part shut from spawn; here a mount beam between
+  // the latch pair, letting go at the latch's strength (a settle test would otherwise drop every door open).
+  const latches: StructBeam[] = [];
+  for (const h of doc.hinges ?? []) {
+    if (!h.autoLatch || !h.latch || !include.has(h.partId)) continue;
+    const ids = hingeIds(doc, h.partId);
+    if (ids.latchPart && ids.latchBody && index.has(ids.latchPart) && index.has(ids.latchBody)) latches.push({ id1: ids.latchPart, id2: ids.latchBody, partId: h.partId, kind: 'mount' });
+  }
+  const beams = [...own, ...latches];
   const m = beams.length;
   const model: SimModel = {
     nodeIds: nodes.map((x) => x.id),
@@ -66,6 +77,7 @@ export function buildSimModel(doc: Doc, tax: TaxonomyLookup, parts: readonly Par
     breakGroups: [],
     beamPart: [],
     nodePart: nodes.map((x) => x.partId),
+    latches: latches.map((_, i) => own.length + i),
   };
   const groupIndex = new Map<string, number>();
   beams.forEach((b, k) => {
@@ -82,7 +94,7 @@ export function buildSimModel(doc: Doc, tax: TaxonomyLookup, parts: readonly Par
     model.spring[k] = v.beamSpring;
     model.damp[k] = v.beamDamp;
     model.deform[k] = v.beamDeform;
-    model.strength[k] = v.beamStrength ?? Infinity;
+    model.strength[k] = k >= own.length && hinge ? hinge.latchStrength : (v.beamStrength ?? Infinity);
     model.expansionLimit[k] = v.deformLimitExpansion;
     model.compressionLimit[k] = 0.5; // a beam may crush to half its length
     if (v.beamType === 'SUPPORT') model.beamType[k] = 1;

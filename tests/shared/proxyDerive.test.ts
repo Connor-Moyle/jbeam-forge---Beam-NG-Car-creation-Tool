@@ -121,6 +121,20 @@ describe('derivation', () => {
     expect(anchors.size).toBeGreaterThanOrEqual(4);
   });
 
+  it('holds a far end on a rigid relative when the parent is out of reach there (a windscreen on a tub, its top on the roof)', () => {
+    // The tub's nodes run along the cowl (z = 0); the screen rises 0.8 m to the roof, whose nodes sit at z = 0.85.
+    const tub = [0, 0.3, 0.6, 0.9, 1.2].map((x, i) => node(`p${i}`, x, 0, 0));
+    const roof = [0, 0.3, 0.6, 0.9, 1.2].map((x, i) => node(`r${i}`, x, 0.3, 0.85));
+    const screen = [0, 0.3, 0.6, 0.9, 1.2].flatMap((x, i) => [node(`b${i}`, x, 0, 0.05), node(`m${i}`, x, 0.15, 0.4), node(`t${i}`, x, 0.3, 0.8)]);
+    const alone = attachToParent(screen, tub, 'clipped', 's');
+    expect(alone.some((b) => b.id1.startsWith('t'))).toBe(false); // the top is beyond the tub's reach: it would pivot about the cowl
+    const held = attachToParent(screen, tub, 'clipped', 's', { relatives: roof });
+    const top = held.filter((b) => b.id1.startsWith('t'));
+    expect(top.length).toBeGreaterThan(0);
+    expect(top.every((b) => b.id2.startsWith('r'))).toBe(true); // on the roof, not on a long beam down to the tub
+    expect(held.filter((b) => b.id1.startsWith('b')).every((b) => b.id2.startsWith('p'))).toBe(true); // the bottom still on the tub
+  });
+
   it('skips parent nodes a few millimetres away (a beam that short shakes)', () => {
     const parent = [node('p1', 0, 0, 0.003), node('p2', 0.3, 0, 0), node('p3', 0, 0.3, 0)];
     const child = [node('c1', 0, 0, 0), node('c2', 0.1, 0, 0), node('c3', 0, 0.1, 0)];

@@ -48,6 +48,8 @@ export interface SimModel {
   /** Index into breakGroups, −1 = none. */
   breakGroup: Int32Array;
   breakGroups: string[];
+  /** Beams standing in for the game's latch couplers (a hinged part held shut from spawn); a swing test lets its part's go. */
+  latches?: number[];
   /** Beam owner (part id) — for results and heatmaps. */
   beamPart: string[];
   /** Node owner (part id), when known. */

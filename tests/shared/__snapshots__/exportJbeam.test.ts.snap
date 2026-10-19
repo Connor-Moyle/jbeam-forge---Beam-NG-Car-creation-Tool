@@ -164,6 +164,17 @@ exports[`jbeam export > writes the body part deterministically (snapshot) 1`] = 
         ["h6r",  "b25r"],
         ["h6r",  "b22r"],
         ["h6r",  "b18r"],
+        ["hs1r", "b11r"],
+        ["hs1r", "b17"],
+        ["hs1r", "b22r"],
+        ["h1l",  "b11l"],
+        ["h2",   "b4l"],
+        ["h3l",  "b18l"],
+        ["h1r",  "b11r"],
+        ["h3r",  "b18r"],
+        ["h6l",  "b23l"],
+        ["h6r",  "b23r"],
+        ["hs1r", "b16r"],
         {"breakGroup":""}
     ],
     "triangles": [

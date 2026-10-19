@@ -200,7 +200,7 @@ export function removeHinge(partId: string): void {
       const cc = context(d, partId);
       if (!cc) return;
       clearHinge(d, partId, nodePrefix(cc.part, cc.entry));
-      reattachPart(d, cc.part, cc.entry);
+      reattachPart(d, cc.part, cc.entry, currentTaxonomy());
     },
   });
   if (useHingeUi.getState().partId === partId) useHingeUi.getState().show(null);

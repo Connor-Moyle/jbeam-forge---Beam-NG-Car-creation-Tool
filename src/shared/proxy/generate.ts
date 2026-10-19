@@ -335,10 +335,10 @@ export function hingeUp(doc: Doc, part: Part, entry: TaxonomyEntry): boolean {
 }
 
 /** Bolt a part to its parent again (after its hinge is removed). */
-export function reattachPart(doc: Doc, part: Part, entry: TaxonomyEntry): void {
+export function reattachPart(doc: Doc, part: Part, entry: TaxonomyEntry, tax?: TaxonomyLookup): void {
   const nodes = doc.nodes.filter((n) => n.partId === part.id);
   doc.beams = doc.beams.filter((b) => !(b.partId === part.id && b.kind === 'attach'));
-  doc.beams.push(...attachBeams(doc, part, entry, nodes, partSettings(doc, part, entry).attachment).beams);
+  doc.beams.push(...attachBeams(doc, part, entry, nodes, partSettings(doc, part, entry).attachment, tax).beams);
 }
 
 function attachBeams(doc: Doc, part: Part, entry: TaxonomyEntry, nodes: readonly StructNode[], style: PartProxy['attachment'], tax?: TaxonomyLookup) {
@@ -352,7 +352,14 @@ function attachBeams(doc: Doc, part: Part, entry: TaxonomyEntry, nodes: readonly
   const parentMoves = !parent || !parentEntry || !!parentEntry.openable || doc.hinges.some((h) => h.partId === parent.id);
   const parentNodes = !parentMoves && parent?.parentPartId ? [...own, ...swapSafeParentNodes(doc, parent.parentPartId)] : own;
   if (!parentNodes.length) return { beams: [], warning: 'Its parent part has no structure yet: generate the parent, then this part attaches automatically.' };
-  const gap = parentGap(nodes, parentNodes);
+  // Rigid relatives a far end may hold on to (a windscreen's top on the roof, a roof on the cage): structure and
+  // fixed panels beside this part under the same parent; never doors, glass, lights or add-ons, nor anything that moves.
+  const rigid = (p: Part) => {
+    const e = tax?.entry(p.taxonomyId);
+    return !!e && !e.openable && !p.variantOf && !doc.hinges.some((h) => h.partId === p.id) && (e.category === 'Body & Structure' || (e.category === 'Panels' && e.subcategory !== 'Doors'));
+  };
+  const relatives = parentMoves ? [] : doc.parts.filter((p) => p.id !== part.id && p.parentPartId === part.parentPartId && rigid(p)).flatMap((p) => swapSafeParentNodes(doc, p.id));
+  const gap = parentGap(nodes, [...parentNodes, ...relatives]);
   // Openable parts are held shut by temporary breakable bolts until a hinge replaces them.
   const warning = entry.openable
     ? `${entry.label} opens: until you add its hinge (Inspector → Hinge) it is held shut by temporary breakable bolts.`
@@ -361,7 +368,7 @@ function attachBeams(doc: Doc, part: Part, entry: TaxonomyEntry, nodes: readonly
       : null;
   // Glass is clipped into its frame all the way round.
   const span = entry.beamPreset === 'glass_brittle' ? GLASS_ATTACH_SPAN : undefined;
-  return { beams: attachToParent(nodes, parentNodes, entry.openable ? 'bolted' : style, part.id, span ? { span } : {}), warning };
+  return { beams: attachToParent(nodes, parentNodes, entry.openable ? 'bolted' : style, part.id, { ...(span ? { span } : {}), ...(relatives.length ? { relatives } : {}) }), warning };
 }
 
 /**

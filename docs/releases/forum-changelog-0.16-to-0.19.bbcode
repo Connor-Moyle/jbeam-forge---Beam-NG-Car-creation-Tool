@@ -1,4 +1,4 @@
-[SIZE=6][B]JBeam Forge: change list, 0.16.0 to 0.19.4[/B][/SIZE]
+[SIZE=6][B]JBeam Forge: change list, 0.16.0 to 0.19.5[/B][/SIZE]
 
 [B]Downloads:[/B] [URL='https://github.com/Connor-Moyle/jbeam-forge---Beam-NG-Car-creation-Tool/releases']GitHub Releases[/URL] (Windows installer and portable exe, Linux .deb and AppImage, the Blender add-on, and JBeam Forge for inside the game). The installer updates any earlier version in place; your settings, projects and library stay.
 [B]Bugs:[/B] [URL='https://github.com/Connor-Moyle/jbeam-forge---Beam-NG-Car-creation-Tool/issues']GitHub Issues[/URL]
@@ -6,6 +6,14 @@
 Project formats: 0.16 saves v25, 0.17 v26, 0.18 v27, 0.19 v28. Every version opens older projects; an older version can't open a project saved by a newer one.
 
 [HR][/HR]
+
+[SIZE=5][B]0.19.5[/B][/SIZE] — parts held at both ends, latches in the sandbox, lights get their own material in one click
+
+[LIST]
+[*]A part whose parent reaches only one edge of it (a windscreen on a tub, a cage standing on the body, a roof-edge wing) was held along that line and pivoted about it. Its far end now holds on to a rigid neighbour under the same parent (a roof, a cage, a fixed panel; never a door, glass, a light or an add-on). Regenerate to get the new attachments.
+[*]The Testing workspace's settle test holds doors, bonnets and tailgates shut as the game's latch does (they used to fall open), and its jack stands no longer pick a diffuser's featherweight node or blow it up.
+[*]A light sharing its material with other parts can't glow; the export's warning now has [B]Give the lights their own material[/B], which copies the material onto the light meshes only ("…_light") so the glow map can use it. The practice car exports with no warnings now.
+[/LIST]
 
 [SIZE=5][B]0.19.4[/B][/SIZE] — more names sorted on import
 
