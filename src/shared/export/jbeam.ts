@@ -7,7 +7,7 @@ import { serializeJbeam, JbeamComment, type WritableObject, type WritableValue }
 import { readTable, writeTable, type WritableRecord } from '../jbeam/tables';
 import { materialDefaults, partPrice } from '../parts/materials';
 import { ATTACHMENT_VALUES, BEAM_PRESET_VALUES, type BeamPresetId, type BeamValues } from '../proxy/presets';
-import { partRole, partSettings } from '../proxy/generate';
+import { partRole, partSettings, swapSafeParentNodes } from '../proxy/generate';
 import { beamPhysics, DEFORM_LIMIT_EXPANSION } from '../proxy/beamValues';
 import { couplerFor, type Hinge } from '../hinges/schema';
 import { hingeIds } from '../hinges/build';
@@ -504,13 +504,18 @@ export function buildJbeamFiles(fullDoc: Doc, tax: TaxonomyLookup, opts: JbeamEx
   const fromFitted = (k: string) => fitted.has(k.slice(0, k.indexOf(':')));
   const doc: Doc = { ...fullDoc, parts: fullDoc.parts.filter((p) => !SET_KINDS.has(p.taxonomyId) && !isEmptyPart(fullDoc, p)) };
   const setParts = new Set(fullDoc.parts.filter((p) => SET_KINDS.has(p.taxonomyId)).map((p) => p.id));
-  const bodyNodes = fullDoc.nodes.filter((n) => !setParts.has(n.partId));
-  // Where a borrowed suspension, engine or gearbox bolts on: the body and its structure (frame,
-  // floor, subframes…). Not the doors, hood or an engine block of ours: a suspension tied to the
+  // Nodes anything borrowed (a set, a plate, the hitch, the nitrous bottle) can bolt to: of parts in every
+  // configuration (no variants), and of a part that comes in versions (a body in several kits) only the node
+  // names every version has, so what is bolted on stays bolted whichever version a configuration picks (a kit
+  // body's own nodes had the engine fall off the stock one).
+  const safeIds = new Set(doc.parts.filter((p) => !p.variantOf).flatMap((p) => swapSafeParentNodes(fullDoc, p.id).map((n) => n.id)));
+  const bodyNodes = fullDoc.nodes.filter((n) => !setParts.has(n.partId) && safeIds.has(n.id));
+  // Where a borrowed suspension, engine or gearbox bolts on: the body shell (a truck's frame and cab). Not the
+  // doors, hood, a cage a configuration can leave out, or an engine block of ours: a suspension tied to the
   // doors and the hood pulled the car apart as it settled.
   const mountNodes = (() => {
     const body = bodyPart(doc, tax);
-    const structural = new Set(doc.parts.filter((p) => p.id === body?.id || (tax.entry(p.taxonomyId)?.beamPreset === 'structure_stiff' && !tax.entry(p.taxonomyId)?.openable)).map((p) => p.id));
+    const structural = new Set(doc.parts.filter((p) => !p.variantOf && (p.id === body?.id || (SHELL_KINDS as readonly string[]).includes(p.taxonomyId))).map((p) => p.id));
     const nodes = bodyNodes.filter((n) => structural.has(n.partId));
     return nodes.length ? nodes : bodyNodes;
   })();

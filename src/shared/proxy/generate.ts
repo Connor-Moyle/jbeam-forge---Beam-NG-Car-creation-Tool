@@ -352,11 +352,12 @@ function attachBeams(doc: Doc, part: Part, entry: TaxonomyEntry, nodes: readonly
   const parentMoves = !parent || !parentEntry || !!parentEntry.openable || doc.hinges.some((h) => h.partId === parent.id);
   const parentNodes = !parentMoves && parent?.parentPartId ? [...own, ...swapSafeParentNodes(doc, parent.parentPartId)] : own;
   if (!parentNodes.length) return { beams: [], warning: 'Its parent part has no structure yet: generate the parent, then this part attaches automatically.' };
-  // Rigid relatives a far end may hold on to (a windscreen's top on the roof, a roof on the cage): structure and
-  // fixed panels beside this part under the same parent; never doors, glass, lights or add-ons, nor anything that moves.
+  // Rigid relatives a far end may hold on to (a windscreen's top on the roof): structure and fixed panels beside this
+  // part under the same parent; never doors, glass, lights or add-ons, nor anything that moves, nor a cage, which a
+  // configuration (or the parts menu) leaves out, so a seat held by it would hang on nodes that aren't there.
   const rigid = (p: Part) => {
     const e = tax?.entry(p.taxonomyId);
-    return !!e && !e.openable && !p.variantOf && !doc.hinges.some((h) => h.partId === p.id) && (e.category === 'Body & Structure' || (e.category === 'Panels' && e.subcategory !== 'Doors'));
+    return !!e && !e.openable && !p.variantOf && !doc.hinges.some((h) => h.partId === p.id) && e.subcategory !== 'Rollcage' && (e.category === 'Body & Structure' || (e.category === 'Panels' && e.subcategory !== 'Doors'));
   };
   const relatives = parentMoves ? [] : doc.parts.filter((p) => p.id !== part.id && p.parentPartId === part.parentPartId && rigid(p)).flatMap((p) => swapSafeParentNodes(doc, p.id));
   const gap = parentGap(nodes, [...parentNodes, ...relatives]);

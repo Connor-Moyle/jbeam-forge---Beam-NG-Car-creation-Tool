@@ -353,6 +353,8 @@ export interface DesignTarget {
   hasTurbo: boolean;
   /** The base engine set's weight, kg (its nodes). */
   gameMassKg: number;
+  /** The least its node weights can be scaled and still run at 2000 Hz (its beams need weight under them). */
+  minMassScale?: number;
 }
 
 /**
@@ -379,6 +381,7 @@ export function editsForDesign(design: EngineDesign, target: DesignTarget, field
     set(target.keys.wastegateStart, design.boost);
     set(target.keys.wastegateLimit, design.boost + 2);
   }
-  if (target.gameMassKg > 0) out[massScaleKey] = Math.round(clamp(result.massKg / target.gameMassKg, 0.3, 3) * 100) / 100;
+  // A design lighter than its base keeps the weight the base engine's beams need at 2000 Hz.
+  if (target.gameMassKg > 0) out[massScaleKey] = Math.round(clamp(result.massKg / target.gameMassKg, Math.max(0.3, target.minMassScale ?? 0), 3) * 100) / 100;
   return { fields: out, torque: curve, design, result };
 }

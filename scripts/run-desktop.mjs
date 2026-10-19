@@ -4989,5 +4989,10 @@ if (badLog.length) console.log(`FAIL  main.log error lines:\n      ${badLog.join
 
 const failed = results.some((r) => !r.ok) || badConsole.length > 0 || badLog.length > 0;
 if (!failed) rmSync(userData, { recursive: true, force: true });
-else console.log(`\nuserData kept for inspection: ${userData}`);
+else {
+  // Only the latest failure is kept: earlier kept copies (3 GB each, with the game's parts cut) filled the disk.
+  const tmp = join(userData, '..');
+  for (const d of readdirSync(tmp)) if (d.startsWith('jbforge-harness-') && join(tmp, d) !== userData) rmSync(join(tmp, d), { recursive: true, force: true });
+  console.log(`\nuserData kept for inspection: ${userData}`);
+}
 process.exit(failed ? 1 : 0);

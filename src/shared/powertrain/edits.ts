@@ -1,6 +1,6 @@
 import { isJbeamObject, type JbeamObject, type JbeamValue } from '../jbeam/parse';
 import type { PowertrainEdits } from '../project/schema';
-import type { DesignTarget } from './design';
+import { designName, type DesignTarget } from './design';
 
 /**
  * The engine builder and gearbox builder: every number a fitted engine or
@@ -269,6 +269,62 @@ export function setMass(parts: Readonly<Record<string, JbeamObject>>): number {
   return total;
 }
 
+/**
+ * The least the set's node weights can be scaled and still run at the game's 2000 Hz: a node's beams (springs
+ * summed, damping summed) need weight under them, and the worst node sets the floor, with a margin. A design
+ * much lighter than its base engine would otherwise shake the game engine's beams apart at spawn.
+ */
+export function minMassScale(parts: Readonly<Record<string, JbeamObject>>): number {
+  const DT = 1 / 2000;
+  const weight = new Map<string, number>();
+  const sumK = new Map<string, number>();
+  const sumC = new Map<string, number>();
+  for (const body of Object.values(parts)) {
+    if (Array.isArray(body.nodes)) {
+      let w = 25;
+      for (const row of body.nodes.slice(1)) {
+        if (isJbeamObject(row)) {
+          if (typeof row.nodeWeight === 'number') w = row.nodeWeight;
+          continue;
+        }
+        if (!Array.isArray(row) || typeof row[0] !== 'string') continue;
+        const own = row.find((c): c is JbeamObject => isJbeamObject(c));
+        weight.set(row[0], own && typeof own.nodeWeight === 'number' ? own.nodeWeight : w);
+      }
+    }
+    if (Array.isArray(body.beams)) {
+      let k = 4_300_000;
+      let c = 580;
+      let type = '|NORMAL';
+      for (const row of body.beams.slice(1)) {
+        if (isJbeamObject(row)) {
+          if (typeof row.beamSpring === 'number') k = row.beamSpring;
+          if (typeof row.beamDamp === 'number') c = row.beamDamp;
+          if (typeof row.beamType === 'string') type = row.beamType;
+          continue;
+        }
+        if (!Array.isArray(row) || typeof row[0] !== 'string' || typeof row[1] !== 'string') continue;
+        const own = row.find((x): x is JbeamObject => isJbeamObject(x));
+        const bk = own && typeof own.beamSpring === 'number' ? own.beamSpring : k;
+        const bc = own && typeof own.beamDamp === 'number' ? own.beamDamp : c;
+        if (/BOUNDED|SUPPORT/.test(own && typeof own.beamType === 'string' ? own.beamType : type)) continue;
+        for (const id of [row[0], row[1]]) {
+          sumK.set(id, (sumK.get(id) ?? 0) + bk);
+          sumC.set(id, (sumC.get(id) ?? 0) + bc);
+        }
+      }
+    }
+  }
+  let floor = 0;
+  for (const [id, m] of weight) {
+    if (!(m > 0)) continue;
+    // Stable while sqrt(Σk/m)·dt/2 and (Σc/m)·dt/2 stay under 1; held to 0.9.
+    const need = Math.max(((sumK.get(id) ?? 0) * DT * DT) / 4 / 0.81, ((sumC.get(id) ?? 0) * DT) / 2 / 0.9);
+    floor = Math.max(floor, need / m);
+  }
+  return floor;
+}
+
 const r4 = (n: number) => Math.round(n * 10000) / 10000;
 
 function scaleNodeWeights(table: JbeamValue, k: number): JbeamValue {
@@ -318,6 +374,11 @@ export function applyPowertrainEdits(parts: Readonly<Record<string, JbeamObject>
       const header = Array.isArray(sec.torque) && Array.isArray(sec.torque[0]) ? sec.torque[0] : ['rpm', 'torque'];
       sec.torque = [header, ...[...edits.torque].sort((a, b) => a[0] - b[0]).map(([r, t]) => [r4(r), r4(t)])];
     }
+  }
+  // A designed engine is listed under its design's name, not the game engine it was built on.
+  if (edits.design) {
+    const info = touch(root, 'information');
+    if (info) info.name = designName(edits.design);
   }
   if (edits.gearRatios && edits.gearRatios.length) {
     const p = ratiosPart(parts, root);
@@ -472,5 +533,5 @@ export function designTarget(parts: Readonly<Record<string, JbeamObject>>, root:
     if (typeof t.wastegateStart === 'number') keys.wastegateStart ??= fieldKey(part, 'turbocharger', 'wastegateStart');
     if (typeof t.wastegateLimit === 'number') keys.wastegateLimit ??= fieldKey(part, 'turbocharger', 'wastegateLimit');
   }
-  return { keys, hasTurbo, gameMassKg: setMass(parts) };
+  return { keys, hasTurbo, gameMassKg: setMass(parts), minMassScale: minMassScale(parts) };
 }

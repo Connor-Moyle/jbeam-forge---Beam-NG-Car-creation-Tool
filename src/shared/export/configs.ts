@@ -1,6 +1,7 @@
 import type { Part, Project, VehicleConfig } from '../project/schema';
 import { partPrice } from '../parts/materials';
 import { pcPaints, type GamePaint } from '../paints/paints';
+import { designName } from '../powertrain/design';
 import { firstSlotType } from '../jbeam/slots';
 import { axleTag, axleTags, bodyPart, engineSlotType, engineTags, isEmptyPart, SET_KINDS, slotTypeOf, variableName, type SuspensionSetData, type TaxonomyLookup } from './jbeam';
 
@@ -87,7 +88,7 @@ export function slotChoices(doc: Pick<Project, 'parts'> & Partial<Pick<Project, 
     const tags = engineTags(pt);
     const engines = [pt.engine, ...pt.alternates].flatMap((e) => {
       const data = sets[e.setId];
-      return data ? [{ name: `${doc.meta!.slug}_${tags.get(e.sourceId) ?? 'E'}_${data.root}`, label: `${e.vehicle} ${e.name}`, ids: partsOf(e.sourceId) }] : [];
+      return data ? [{ name: `${doc.meta!.slug}_${tags.get(e.sourceId) ?? 'E'}_${data.root}`, label: e.edits?.design ? designName(e.edits.design) : `${e.vehicle} ${e.name}`, ids: partsOf(e.sourceId) }] : [];
     });
     axles.push({
       slotType: engineSlotType(doc.meta.slug),

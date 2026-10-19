@@ -46,7 +46,7 @@ for (const b of beams) {
   const A = nodes.get(b.a);
   const B = nodes.get(b.b);
   if (!A || !B) {
-    problems.push(`${b.part}: beam ${b.a}-${b.b} names a missing node`);
+    problems.push(`${b.part}: beam ${b.a}-${b.b} names a missing node (${[!A && b.a, !B && b.b].filter(Boolean).join(', ')})`);
     continue;
   }
   const len = Math.hypot(A.pos[0] - B.pos[0], A.pos[1] - B.pos[1], A.pos[2] - B.pos[2]);

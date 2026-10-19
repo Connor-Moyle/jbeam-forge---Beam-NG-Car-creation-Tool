@@ -95,4 +95,15 @@ describe('engine designer', () => {
     const plain = editsForDesign(d, { ...target, hasTurbo: false }, {}, '@massScale');
     expect(Math.max(...plain.torque.map(([, t]) => t))).toBeCloseTo(e.result.peakTorque.nm, 0);
   });
+
+  it('a light design keeps the weight the base engine’s beams need at 2000 Hz', () => {
+    // 25 kg nodes with two 20 MN/m beams on e1: it needs 2 × 20e6 × dt² / 4 / 0.81 kg, so the scale floors there.
+    const parts: Parameters<typeof designTarget>[0] = {
+      engine: { mainEngine: { torque: [['rpm', 'torque'], [0, 100], [6000, 150]] }, nodes: [['id', 'posX', 'posY', 'posZ'], { nodeWeight: 25 }, ['e1', 0, 0, 0], ['e2', 0, 1, 0], ['e3', 1, 0, 0]], beams: [['id1:', 'id2:'], { beamSpring: 20_000_000, beamDamp: 1000 }, ['e1', 'e2'], ['e1', 'e3'], { beamType: '|SUPPORT' }, ['e2', 'e3']] },
+    };
+    const target = designTarget(parts, 'engine');
+    expect(target.minMassScale).toBeCloseTo((2 * 20_000_000 * (1 / 2000) ** 2) / 4 / 0.81 / 25, 4);
+    const tiny = { ...DEFAULT_DESIGN, cylinders: 1, bore: 40, stroke: 40 };
+    expect(editsForDesign(tiny, { ...target, minMassScale: 0.6 }, {}, '@massScale').fields['@massScale']).toBe(0.6);
+  });
 });

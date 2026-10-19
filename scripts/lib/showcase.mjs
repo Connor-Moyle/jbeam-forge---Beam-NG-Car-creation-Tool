@@ -21,6 +21,54 @@ const MOVING = {
   'Power seats': { 'Seat (slides)': /^seat_F[LR]_cushion$/, 'Backrest (reclines)': /^seat_F[LR]_backrest$/ },
 };
 
+/**
+ * The Skyline R31's versions: a kit word (the variant every slot that has one takes) with per-slot overrides
+ * ('empty', 'stock' or another kit word), then the engine and the suspensions. Slots only the kits bring
+ * (skirts, the roof wing, the cage) are empty unless the kit or an override fills them.
+ */
+const SKY_SLOTS = {
+  body: [/^Body shell$/, 'aero drift race sport wide'],
+  bumperF: [/^Front bumper$/, 'cut drift heavy offroad race sport'],
+  bumperR: [/^Rear bumper$/, 'aero drift heavy offroad race sport wide'],
+  hood: [/^Hood$/, 'drift race sport'],
+  grille: [/^Grille$/, 'aero cut drift race sport'],
+  headL: [/^Left headlight$/, 'aero cut drift race sport'],
+  headR: [/^Right headlight$/, 'aero cut drift race sport'],
+  tailL: [/^Left taillight$/, 'drift race sport'],
+  tailR: [/^Right taillight$/, 'drift race sport'],
+  mirL: [/^Left side mirror$/, 'race'],
+  mirR: [/^Right side mirror$/, 'race'],
+  exhaust: [/^Exhaust$/, 'aero carbon drift heavy race sport wide'],
+  spoiler: [/^Spoiler$/, 'aero carbon drift race sport'],
+  doorL: [/^Front Left door$/, 'drift race sport'],
+  doorR: [/^Front Right door$/, 'drift race sport'],
+  seatL: [/^Front Left seat$/, 'drift race sport'],
+  seatR: [/^Front Right seat$/, 'drift race sport'],
+  skirtL: [/^Left side skirt/, 'drift race sport', 'kit-only'],
+  skirtR: [/^Right side skirt/, 'drift race sport', 'kit-only'],
+  wing: [/^Rear wing/, 'drift race', 'kit-only'],
+  cage: [/^Roll cage/, '', 'kit-only'],
+};
+const SKY_SUSPENSION = { stock: /BX-Series/, drift: /ProDrift/, race: /Miramar/, rally: /Sunburst/, drag: /Burnside/, offroad: /D-Series/, heavy: /H-Series/ };
+function skyline(name, type, kit, { engine, suspension = 'stock', ...over } = {}) {
+  const picks = [];
+  for (const [slot, [re, has, kitOnly]] of Object.entries(SKY_SLOTS)) {
+    const want = over[slot] ?? kit;
+    if (want === 'empty') picks.push([re, 'empty']);
+    else if (want && want !== 'stock' && (has.split(' ').includes(want) || (slot === 'cage' && want === 'cage'))) picks.push([re, slot === 'cage' ? /^Roll cage$/ : new RegExp(`\\(${want[0].toUpperCase()}${want.slice(1)}\\)`)]);
+    else if (kitOnly) picks.push([re, 'empty']);
+  }
+  picks.push([/^Engine$/, engine], [/^Front axle suspension$/, SKY_SUSPENSION[suspension]], [/^Rear axle suspension$/, SKY_SUSPENSION[suspension]]);
+  return { name, type, picks };
+}
+const SKY_ENGINE = {
+  rb20: /2\.0 L inline-6 turbo/, rb26: /2\.6 L inline-6 twin-turbo/, v8sc: /4\.1 L V8 supercharged/,
+  // (the 200BX 5.5 V8 and the Hopper six carry the supercharged V8 and the 2.6 twin-turbo designs: they are listed under those names)
+  bx20: /BX-Series 2\.0L/, bx24: /BX-Series 2\.4L/, bx45: /BX-Series 4\.5L/,
+  etk20: /ETK.*2\.0L/, etk30d: /ETK.*3\.0L.*Diesel/i, etk44: /ETK.*4\.4L/,
+  miramar: /Miramar.*1\.9L/, barstow: /Barstow.*423/, moonhawk: /Moonhawk.*448/, v10: /Scintilla.*V10/, pickup: /D-Series.*6\.9L/, sbr: /SBR.*2\.5L/,
+};
+
 export const SHOWCASE_CARS = {
   forge_crawler: {
     name: 'Forge Crawler',
@@ -165,6 +213,71 @@ export const SHOWCASE_CARS = {
       { name: 'Race', type: 'Race', picks: [[/^Front bumper$/, /Race/], [/side skirt$/, /Race/], [/^Exhaust$/, /Race/], [/^Bed$/, 'empty'], [/^Interior trim/, 'empty'], [/^Sunroof/, 'empty'], [/^Roof rack$/, 'empty'], [/^Light bar$/, 'empty'], [/^Snorkel$/, 'empty'], [/skid plate$/, 'empty'], [/^Spare wheel$/, 'empty'], [/mud ?flap/i, 'empty'], [/^Engine$/, /6\.9L V8/], [/axle suspension$/, /4-Link/]] },
     ],
   },
+  skyline_r31: {
+    name: 'Skyline R31 Showcase',
+    // A right-hand-drive coupé on the 200BX's struts and semi-trailing arms; the other suspensions each version picks from:
+    // the 200BX drift front, the Miramar's wide race set, the Sunburst's rally set, the Burnside gasser (drag), the
+    // D-Series desert set (off-road) and the van's beam axle with the heavy rear (heavy duty).
+    axles: ['bx/bx_suspension_F', 'bx/bx_suspension_R'],
+    axleOptions: [
+      ['bx/bx_suspension_F_prodrift', 'miramar/miramar_suspension_F_race_wide', 'sunburst2/sunburst2_suspension_F_rally', 'burnside/burnside_suspension_F_gasser', 'pickup/pickup_desert_suspension_SFA', 'van/van_beamaxle_F'],
+      ['miramar/miramar_suspension_R_race_wide', 'sunburst2/sunburst2_suspension_R', 'burnside/burnside_suspension_R_gassr', 'pickup/pickup_desert_suspension_R', 'van/van_axle_R_heavy'],
+    ],
+    track: 1.44,
+    wheels: '16x',
+    engine: 'etk800/etk_engine_i6_3.0',
+    gearbox: 'etk800/etk_transmission_6M',
+    engineOptions: ['bx/bx_engine_i4_2.0', 'bx/bx_engine_i4_2.4', 'bx/bx_engine_v8_4.5', 'bx/bx_engine_v8_5.5', 'etk800/etk_engine_i4_2.0', 'etk800/etk_engine_i6_3.0_diesel', 'etk800/etk_engine_v8_4.4_petrol', 'miramar/miramar_engine_1.9_dohc', 'barstow/barstow_engine_v8_423', 'moonhawk/moonhawk_engine_v8_448', 'scintilla/scintilla_engine_5.0_v10', 'hopper/hopper_engine_i6', 'pickup/pickup_engine_v8_6.9', 'sbr/sbr_engine_2.5'],
+    // Three engines of our own: an RB20DET-style 2.0 turbo six on the ETK six, an RB26-style 2.6 twin-turbo six on the
+    // Hopper's six, and a 4.1 supercharged V8 on the 200BX's 5.5. Steps are [designer tab, field, value or option].
+    designs: [
+      { on: 'etk800/etk_engine_i6_3.0', preset: 'i6', steps: [['Block', 'Bore', 78], ['Block', 'Stroke', 69.7], ['Induction', 'Induction', /^Turbo/], ['Induction', 'Boost', 10], ['Fuel & tune', 'Compression ratio', 8.5], ['Revs', 'Rev limit', 7500]] },
+      { on: 'hopper/hopper_engine_i6', preset: 'i6', steps: [['Block', 'Bore', 86], ['Block', 'Stroke', 73.7], ['Induction', 'Induction', /Twin/], ['Induction', 'Boost', 14], ['Fuel & tune', 'Compression ratio', 8.5], ['Revs', 'Rev limit', 8000]] },
+      { on: 'bx/bx_engine_v8_5.5', preset: 'v8-supercharged', steps: [['Block', 'Bore', 96], ['Block', 'Stroke', 71], ['Induction', 'Boost', 12], ['Revs', 'Rev limit', 7000]] },
+    ],
+    fuelL: 65,
+    hinges: true,
+    // The glove box lid is a part of its own (the built-in list has none), hinged along its bottom edge.
+    customParts: [{ label: 'Glove box lid', meshes: /^glovebox_lid$/, parent: /^Dashboard/, openable: true }],
+    hingeEdges: [[/Glove box lid/, 'bottom']],
+    moving: { 'Power windows': { 'Window glass': /^door_glass_/ }, 'Folding mirrors': { 'Mirror housings': /^mirror_[LR]$/ }, 'Power seats': { 'Seat (slides)': /^seat_F[LR]_cushion$/, 'Backrest (reclines)': /^seat_F[LR]_backrest$/ } },
+    props: true,
+    propsMin: 3,
+    triggers: true,
+    cameras: ['Driver (right-hand drive)', 'Passenger', 'Hood'],
+    features: ['plateFront', 'plateRear', 'nitrous'],
+    skins: ['GTS-R stripes'],
+    paints: true,
+    tuning: [[/^Body shell$/, 'mass']],
+    horn: /Horn 0[2-9]/,
+    configs: [
+      skyline('GXi', 'Factory', 'stock', { engine: SKY_ENGINE.etk20 }),
+      skyline('GTS', 'Factory', 'stock', { engine: SKY_ENGINE.bx24 }),
+      skyline('GTS-R', 'Factory', 'stock', { engine: SKY_ENGINE.rb20 }),
+      skyline('GTS-X Diesel', 'Factory', 'stock', { engine: SKY_ENGINE.etk30d }),
+      skyline('Classic Tuner', 'Custom', 'stock', { engine: SKY_ENGINE.miramar, spoiler: 'carbon', exhaust: 'carbon' }),
+      skyline('Street Sport', 'Custom', 'sport', { engine: SKY_ENGINE.rb20 }),
+      skyline('Street Tuner', 'Custom', 'sport', { engine: SKY_ENGINE.rb26, suspension: 'drift', exhaust: 'race' }),
+      skyline('Showroom Aero', 'Custom', 'aero', { engine: SKY_ENGINE.etk44, seatL: 'sport', seatR: 'sport' }),
+      skyline('Budget Drifter', 'Custom', 'drift', { engine: SKY_ENGINE.bx24, suspension: 'drift', seatL: 'stock', seatR: 'stock', body: 'stock' }),
+      skyline('Drift Missile', 'Custom', 'drift', { engine: SKY_ENGINE.rb26, suspension: 'drift' }),
+      skyline('Drift Pro', 'Race', 'drift', { engine: SKY_ENGINE.v8sc, suspension: 'drift', body: 'wide', bumperF: 'heavy', bumperR: 'heavy', cage: 'cage' }),
+      skyline('Track Day', 'Race', 'race', { engine: SKY_ENGINE.rb26, suspension: 'race', cage: 'cage' }),
+      skyline('Time Attack', 'Race', 'race', { engine: SKY_ENGINE.v10, suspension: 'race', body: 'wide', cage: 'cage' }),
+      skyline('Endurance', 'Race', 'race', { engine: SKY_ENGINE.etk44, suspension: 'race', bumperF: 'cut', wing: 'empty', cage: 'cage' }),
+      skyline('Rally', 'Race', 'sport', { engine: SKY_ENGINE.rb20, suspension: 'rally', bumperF: 'heavy', bumperR: 'heavy', cage: 'cage', spoiler: 'stock' }),
+      skyline('Rally Gravel', 'Race', 'stock', { engine: SKY_ENGINE.etk30d, suspension: 'rally', bumperF: 'offroad', bumperR: 'offroad', headL: 'cut', headR: 'cut', cage: 'cage' }),
+      skyline('Street Drag', 'Custom', 'stock', { engine: SKY_ENGINE.bx45, suspension: 'drag', hood: 'race', exhaust: 'race' }),
+      skyline('Pro Drag', 'Race', 'race', { engine: SKY_ENGINE.v8sc, suspension: 'drag', wing: 'empty', spoiler: 'empty', cage: 'cage' }),
+      skyline('Off-Road', 'Custom', 'stock', { engine: SKY_ENGINE.rb26, suspension: 'offroad', bumperF: 'offroad', bumperR: 'offroad', cage: 'cage' }),
+      skyline('Heavy Duty', 'Custom', 'stock', { engine: SKY_ENGINE.pickup, suspension: 'heavy', bumperF: 'heavy', bumperR: 'heavy', exhaust: 'heavy' }),
+      skyline('Muscle Swap', 'Custom', 'stock', { engine: SKY_ENGINE.barstow, hood: 'race', exhaust: 'wide' }),
+      skyline('Big Block', 'Custom', 'cut', { engine: SKY_ENGINE.moonhawk, suspension: 'drag', exhaust: 'wide' }),
+      skyline('Boxer Swap', 'Custom', 'stock', { engine: SKY_ENGINE.sbr, suspension: 'rally', spoiler: 'aero' }),
+      skyline('V8 Street', 'Custom', 'sport', { engine: SKY_ENGINE.bx45, exhaust: 'sport' }),
+      skyline('Full Race Car', 'Race', 'race', { engine: SKY_ENGINE.v8sc, suspension: 'race', body: 'wide', cage: 'cage' }),
+    ],
+  },
 };
 
 /** The variant words the showcase models use for the versions a configuration can pick (mesh name suffixes). */
@@ -206,6 +319,26 @@ export async function showcaseBuild({ page, base, plan, model, hook, shot, asser
   const partsState = await hook(page, 'partsState');
   const unassigned = (await hook(page, 'sceneStats')).meshes - partsState.assigned;
   assert(unassigned === 0, `every mesh sorted into a part (${unassigned} left over)`);
+  // Parts the built-in list doesn't have (a glove box lid): a custom kind made from the Assign dialog, the meshes moved onto it.
+  for (const cp of plan.customParts ?? []) {
+    const keys = await meshKeys(cp.meshes);
+    assert(keys.length, `${cp.label}: meshes for it (${cp.meshes})`);
+    await hook(page, 'selectMeshes', keys);
+    await page.getByTestId('scene-assign').click();
+    await page.getByTestId('assign-add-custom').click();
+    await page.getByTestId('custom-label').fill(cp.label);
+    const dialog = page.locator('[role=dialog]').last();
+    if (cp.parent) {
+      await dialog.getByRole('combobox').nth(1).click();
+      await page.locator('[data-radix-popper-content-wrapper] [role=option]').filter({ hasText: cp.parent }).first().click();
+    }
+    if (cp.openable) await dialog.getByRole('checkbox', { name: /^Opens/ }).click();
+    await page.getByTestId('custom-create').click();
+    await page.getByTestId('assign-confirm').click();
+    await closeDialogs();
+    const made = (await hook(page, 'partsState')).parts.find((p) => p.displayName === cp.label);
+    assert(made, `${cp.label} is a part of its own`);
+  }
   // The weight of the parts that carry the car (a truck's frame and cab), set in the Inspector before the structure is made.
   // A part picked in the Scene tree the way a user finds it: typed into its search, then clicked.
   const pickPart = async (re) => {
@@ -303,6 +436,53 @@ export async function showcaseBuild({ page, base, plan, model, hook, shot, asser
     await page.getByTestId('fuel-card').waitFor();
     await pressEnter(page.getByLabel('Fuel capacity'), plan.fuelL);
   }
+  // Engines of our own from the Engine workspace: each is designed on a game engine (made the default while it is
+  // worked on, its mounts, shape and sound), given its own 3D model, then put back among the other engines.
+  const makeDefault = async (setId) => {
+    const d = await hook(page, 'projectDoc');
+    if (d.powertrain.engine?.setId === setId) return;
+    const a = (d.powertrain.alternates ?? []).find((x) => x.setId === setId);
+    assert(a, `${setId} among the other engines`);
+    const row = page.getByTestId('engine-options').locator('div', { has: page.getByRole('button', { name: 'Make default' }) }).filter({ hasText: a.vehicle }).filter({ hasText: a.name }).last();
+    await row.getByRole('button', { name: 'Make default' }).click();
+    for (let i = 0; i < 100 && (await hook(page, 'projectDoc')).powertrain.engine?.setId !== setId; i++) await page.waitForTimeout(100);
+  };
+  for (const design of plan.designs ?? []) {
+    await makeDefault(design.on);
+    await page.getByTestId('engine-design').click();
+    await page.getByTestId('engine-designer').waitFor();
+    await page.getByTestId(`engine-preset-${design.preset}`).click();
+    for (const [tab, label, value] of design.steps ?? []) {
+      await page.getByTestId('engine-designer').getByRole('tab', { name: tab }).click();
+      const field = page.getByTestId('engine-designer').locator(`[aria-label="${label}"]:not([role=tabpanel])`);
+      if (value instanceof RegExp) {
+        await field.click();
+        await page.locator('[data-radix-popper-content-wrapper] [role=option]').filter({ hasText: value }).first().click();
+      } else if ((await field.getAttribute('role')) === 'slider') {
+        // A slider: from its minimum, as many steps as it takes (the step is learnt from one press).
+        await field.focus();
+        await page.keyboard.press('Home');
+        const min = Number(await field.getAttribute('aria-valuenow'));
+        await page.keyboard.press('ArrowRight');
+        const step = Number(await field.getAttribute('aria-valuenow')) - min;
+        for (let k = 1; k < Math.round((value - min) / step); k++) await page.keyboard.press('ArrowRight');
+        assert(Math.abs(Number(await field.getAttribute('aria-valuenow')) - value) <= step, `${label} set to ${value} (${await field.getAttribute('aria-valuenow')})`);
+      } else await pressEnter(field, value);
+    }
+    if (design.model !== false) {
+      await page.getByTestId('engine-model-build').click();
+      await page.getByTestId('engine-model-game').waitFor({ timeout: 120_000 });
+    }
+    await shot(page, `showcase-design-${design.preset}`);
+    await page.getByTestId('engine-designer').getByRole('button', { name: 'Back' }).click();
+  }
+  if (plan.designs) {
+    await makeDefault(plan.engine);
+    doc = await hook(page, 'projectDoc');
+    const designed = [doc.powertrain.engine, ...(doc.powertrain.alternates ?? [])].filter((e) => e.edits?.design);
+    assert(designed.length === plan.designs.length, `${plan.designs.length} engines of our own designed (${designed.map((e) => `${e.vehicle} ${e.name}`).join(', ')})`);
+    assert(doc.powertrain.engine.setId === plan.engine, 'the default engine is back');
+  }
   doc = await hook(page, 'projectDoc');
   assert(doc.powertrain.engine && doc.powertrain.gearbox && (doc.powertrain.alternates ?? []).length === plan.engineOptions.length, `engine, gearbox and ${plan.engineOptions.length} other engines fitted`);
   if (plan.fuelL) assert(doc.powertrain.fuelL === plan.fuelL, `fuel capacity ${plan.fuelL} L (${doc.powertrain.fuelL})`);
@@ -320,6 +500,13 @@ export async function showcaseBuild({ page, base, plan, model, hook, shot, asser
     await page.getByTestId('moving-hinge-all').click();
     await page.waitForTimeout(500);
     assert((await hook(page, 'projectDoc')).hinges.length >= 2, 'doors and lids hinged');
+    // A lid that hinges along another edge than the guess (a glove box drops open from its bottom edge).
+    for (const [re, edge] of plan.hingeEdges ?? []) {
+      await page.getByTestId('moving-parts').getByRole('button', { name: re }).first().click();
+      await page.getByTestId('hinge-edge').click();
+      await page.locator('[data-radix-popper-content-wrapper] [role=option]').filter({ hasText: new RegExp(`^${edge} edge`, 'i') }).first().click();
+      await page.waitForTimeout(200);
+    }
   }
   if (plan.props) {
     await page.getByTestId('workspace-moving').click();
@@ -331,7 +518,7 @@ export async function showcaseBuild({ page, base, plan, model, hook, shot, asser
       await page.waitForTimeout(150);
     }
     doc = await hook(page, 'projectDoc');
-    assert((doc.props ?? []).length >= 8, `needles, pedals and the wheel animated (${(doc.props ?? []).length})`);
+    assert((doc.props ?? []).length >= (plan.propsMin ?? 8), `needles, pedals and the wheel animated (${(doc.props ?? []).length})`);
     await shot(page, 'showcase-moving');
   }
   const scriptsAdded = [];
@@ -450,6 +637,19 @@ export async function showcaseBuild({ page, base, plan, model, hook, shot, asser
     const selects = page.getByTestId('config-slots').locator('button[aria-label$=" part"]');
     const n = await selects.count();
     picked[cfg.name] = [];
+    // Once: every slot and what it offers, for writing the picks of a new plan.
+    if (!existsSync(join(outDir, 'showcase-slots.json'))) {
+      const slots = [];
+      for (let i = 0; i < n; i++) {
+        const label = (await selects.nth(i).getAttribute('aria-label')).replace(/ part$/, '');
+        if (await selects.nth(i).isDisabled()) continue;
+        await selects.nth(i).click();
+        const options = await page.locator('[data-radix-popper-content-wrapper] [role=option]').allTextContents();
+        await page.keyboard.press('Escape');
+        slots.push({ label, options });
+      }
+      writeFileSync(join(outDir, 'showcase-slots.json'), JSON.stringify(slots, null, 1));
+    }
     for (let i = 0; i < n; i++) {
       const label = (await selects.nth(i).getAttribute('aria-label')).replace(/ part$/, '');
       const rule = cfg.picks.find(([re]) => re.test(label));
@@ -521,5 +721,12 @@ export async function showcaseBuild({ page, base, plan, model, hook, shot, asser
   assert(lint.status === 0, `the mod lints clean:\n${(lint.stdout + lint.stderr).split('\n').slice(0, 30).join('\n')}`);
   assert(pcs.length === plan.configs.length + 1, `every version exported (${pcs.join(', ')})`);
   for (const c of checks) assert(/RUN: \d+ steps .* stable/.test(c.r.stdout), `${c.pc} holds together at 2000 Hz:\n${c.r.stdout.split('\n').filter((l) => /RUN|worst|nodes,/.test(l)).join('\n')}${c.r.stderr.slice(0, 400)}`);
+  // A beam to one of our nodes that the configuration doesn't have (a kit body's own node) is dropped by the game, so the
+  // part falls off; the check above skips it. Nodes of the game's common parts (hubs) are not in the mod, so they don't count.
+  const ours = new Set((await hook(page, 'projectDoc')).nodes.map((n) => n.id));
+  for (const c of checks) {
+    const dangling = c.r.stdout.split('\n').filter((l) => /names a missing node \(([^)]+)\)/.test(l) && /\(([^)]+)\)$/.exec(l)[1].split(', ').some((id) => ours.has(id)));
+    assert(!dangling.length, `${c.pc}: every beam finds its nodes (${dangling.length} don't):\n${dangling.slice(0, 8).join('\n')}`);
+  }
   await closeDialogs();
 }
