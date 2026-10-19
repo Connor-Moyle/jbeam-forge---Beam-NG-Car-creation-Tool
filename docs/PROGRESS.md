@@ -48,7 +48,7 @@ Every finished phase ships as a Windows installer and a portable exe on GitHub R
 | Version | Contents |
 |---|---|
 | 0.6.0 | Phases 1–6 plus the grouped scene tree |
-| 0.19.6 | Export validator: `loose-piece` warning for structure with no path of beams to the body (car-level islands over the default configuration) |
+| 0.19.6 | Export validator: `loose-piece` warning for structure with no path of beams to the body (car-level islands over the default configuration); harness `press-all` scenario (every control in every workspace and window, 951 pressed, opt-in by name) |
 | 0.19.5 | Generation bridges a part's islands (`bridgeIslands`); sunroof hinge rule; attachments reach rigid relatives (a windscreen's top on the roof, a cage on the roof) when the parent holds only one edge (`AttachOptions.relatives`); the sandbox holds latched parts shut (`SimModel.latches`), stands avoid featherweight nodes and damp by mass; export dialog: "Give the lights their own material" |
 | 0.19.4 | Classifier reads UK English and everyday mesh names (wing with a side = fender / rear quarter, boot lid, tail lamp, rear screen, petrol flap, tailpipe, driver seat and door, accelerator, brake pedal) |
 | 0.19.3 | Springs matched to the car's weight: a borrowed suspension from a much lighter or heavier car gets its springs and dampers scaled in one click (axle edit `$springScale`, applied to the set's strut, spring and shock parts on export) |
