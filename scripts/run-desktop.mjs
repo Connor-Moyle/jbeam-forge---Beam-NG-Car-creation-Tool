@@ -4991,8 +4991,12 @@ const failed = results.some((r) => !r.ok) || badConsole.length > 0 || badLog.len
 if (!failed) rmSync(userData, { recursive: true, force: true });
 else {
   // Only the latest failure is kept: earlier kept copies (3 GB each, with the game's parts cut) filled the disk.
+  // A copy younger than two hours may belong to a run still going (two harnesses at once), so it stays.
   const tmp = join(userData, '..');
-  for (const d of readdirSync(tmp)) if (d.startsWith('jbforge-harness-') && join(tmp, d) !== userData) rmSync(join(tmp, d), { recursive: true, force: true });
+  for (const d of readdirSync(tmp)) {
+    const dir = join(tmp, d);
+    if (d.startsWith('jbforge-harness-') && dir !== userData && statSync(dir).mtimeMs < Date.now() - 2 * 3600e3) rmSync(dir, { recursive: true, force: true });
+  }
   console.log(`\nuserData kept for inspection: ${userData}`);
 }
 process.exit(failed ? 1 : 0);

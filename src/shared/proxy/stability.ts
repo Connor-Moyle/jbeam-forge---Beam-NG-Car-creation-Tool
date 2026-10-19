@@ -66,6 +66,25 @@ export function stabilityLoad(weight: number, springSum: number, dampSum: number
  * Nodes with no weight given (one the caller doesn't own, e.g. a game part's) are left out:
  * beams to them still count on the other end.
  */
+/**
+ * Beams of alternatives that are never fitted together (a slot's engines): per node, those of the alternative
+ * that loads it most, so weighting is for the heaviest case rather than for all of them at once.
+ */
+export function heaviestPerNode(alternatives: readonly (readonly StabiliseBeam[])[], ours: ReadonlySet<string>): StabiliseBeam[] {
+  if (alternatives.length <= 1) return [...(alternatives[0] ?? [])];
+  const sums = alternatives.map((g) => {
+    const m = new Map<string, number>();
+    for (const b of g) for (const id of [b.id1, b.id2]) if (ours.has(id)) m.set(id, (m.get(id) ?? 0) + b.spring);
+    return m;
+  });
+  const chosen = new Map<string, number>();
+  sums.forEach((m, gi) => {
+    for (const [id, k] of m) if (k > (sums[chosen.get(id) ?? -1]?.get(id) ?? -1)) chosen.set(id, gi);
+  });
+  // Only beams on our nodes weigh anything; a beam between a set's own nodes is left out.
+  return alternatives.flatMap((g, gi) => g.filter((b) => chosen.get(b.id1) === gi || chosen.get(b.id2) === gi));
+}
+
 export function stabilise(weights: ReadonlyMap<string, number>, beams: readonly StabiliseBeam[]): StabiliseResult {
   const fixedK = new Map<string, number>();
   const fixedC = new Map<string, number>();

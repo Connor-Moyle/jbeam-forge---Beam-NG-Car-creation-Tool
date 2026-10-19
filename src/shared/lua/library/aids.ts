@@ -22,7 +22,7 @@ export const tractionControl: ScriptTemplate = {
   params: [
     { id: 'slip', label: 'Slip allowed', kind: 'number', default: 0.15, min: 0.02, max: 0.6, step: 0.01, hint: 'How much faster than the car the driven wheels may turn before it steps in (0.15 = 15%)' },
     { id: 'strength', label: 'Strength', kind: 'number', default: 2.5, min: 0.5, max: 8, step: 0.1, hint: 'How hard it cuts for each bit of slip past the limit' },
-    { id: 'floor', label: 'Least throttle', kind: 'number', default: 0.15, min: 0, max: 0.8, step: 0.05, hint: 'It never cuts below this share of your throttle' },
+    { id: 'floor', label: 'Least throttle', kind: 'number', default: 0.3, min: 0, max: 0.8, step: 0.05, hint: 'It never cuts below this share of your throttle' },
     { id: 'start', label: 'Starts', kind: 'choice', default: 'on', options: [{ value: 'on', label: 'On' }, { value: 'off', label: 'Off' }] },
   ],
   outputs: [{ suffix: '', label: 'State (0 off, 1 on, 2 cutting)', min: 0, max: 2 }],
@@ -36,7 +36,7 @@ M.type = "auxiliary"
 local out = "jbf_tc"
 local slipAllowed = 0.15
 local strength = 2.5
-local floor = 0.15
+local floor = 0.3
 local enabled = true
 local factor = 1
 
@@ -84,10 +84,12 @@ end
 
 local function updateGFX(dt)
   local road = math.abs(electrics.values.airspeed or 0)
-  -- Below walking pace any wheel speed is "slip": measure against 2 m/s there.
-  local slip = (drivenSpeed() - road) / math.max(road, 2)
+  local driven = drivenSpeed()
+  -- Below walking pace any wheel speed is "slip": measure against 2 m/s there. Wheels turning slower
+  -- than 3 m/s are a launch, not wheelspin: cutting there held the car at 2500 rpm on a slipping clutch.
+  local slip = (driven - road) / math.max(road, 2)
   local want = 1
-  if enabled and (electrics.values.throttle or 0) > 0.05 and slip > slipAllowed then
+  if enabled and (electrics.values.throttle or 0) > 0.05 and driven > 3 and slip > slipAllowed then
     want = math.max(floor, 1 - (slip - slipAllowed) * strength)
   end
   -- Cut quickly, give back gently, so it doesn't hunt.

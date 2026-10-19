@@ -236,6 +236,8 @@ export const SHOWCASE_CARS = {
       { on: 'bx/bx_engine_v8_5.5', preset: 'v8-supercharged', steps: [['Block', 'Bore', 96], ['Block', 'Stroke', 71], ['Induction', 'Boost', 12], ['Revs', 'Rev limit', 7000]] },
     ],
     fuelL: 65,
+    // The shell's weight (the app's estimate from the rip's mesh, with its floor pans and inner panels, came to 2.7 t).
+    masses: [[/^Body shell$/, 350]],
     hinges: true,
     // The glove box lid is a part of its own (the built-in list has none), hinged along its bottom edge.
     customParts: [{ label: 'Glove box lid', meshes: /^glovebox_lid$/, parent: /^Dashboard/, openable: true }],

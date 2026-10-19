@@ -8,6 +8,7 @@ import { readTable, writeTable, type WritableRecord } from '../jbeam/tables';
 import { materialDefaults, partPrice } from '../parts/materials';
 import { ATTACHMENT_VALUES, BEAM_PRESET_VALUES, type BeamPresetId, type BeamValues } from '../proxy/presets';
 import { partRole, partSettings, swapSafeParentNodes } from '../proxy/generate';
+import { placeRefNodes } from '../proxy/derive';
 import { beamPhysics, DEFORM_LIMIT_EXPANSION } from '../proxy/beamValues';
 import { couplerFor, type Hinge } from '../hinges/schema';
 import { hingeIds } from '../hinges/build';
@@ -26,7 +27,7 @@ import { latchEvents, latchKindOf, resolveBlendTexts } from '../sound/blend';
 import { buildFeatureParts } from './features';
 import { applyPowertrainEdits } from '../powertrain/edits';
 import { engineRevRange, fitShiftingToEngine, type RevRange } from '../powertrain/shiftFit';
-import { softenedValue, stabilise, type StabiliseBeam } from '../proxy/stability';
+import { heaviestPerNode, softenedValue, stabilise, type StabiliseBeam } from '../proxy/stability';
 import { setWheels } from '../suspension/wheels';
 import { mainAdditions } from './drivable';
 
@@ -521,7 +522,9 @@ export function buildJbeamFiles(fullDoc: Doc, tax: TaxonomyLookup, opts: JbeamEx
   })();
   const extraSlots: WritableValue[] = [];
   // Parts not built from our structure (the game's sets, plates, the hitch): their beams load our nodes.
-  const foreign: JbeamObject[] = [];
+  // Each with the slot it fills: alternatives of one slot (the engines, an axle's suspensions) are never on the car together.
+  const foreign: { slot: string; parts: JbeamObject[] }[] = [];
+  let foreignSlot = '';
   const data = (setId: string) => opts.suspensions?.[setId];
   // Meshes of a set bound to groups only the original car had ride on our body instead.
   const bodyGroup = (() => {
@@ -554,7 +557,7 @@ export function buildJbeamFiles(fullDoc: Doc, tax: TaxonomyLookup, opts: JbeamEx
     // Every engine shares the e_ node names (only one is fitted at a time), so the gearbox fits whichever is chosen.
     const t = transplantSuspension({ parts: data.parts, root: data.root, anchors: data.anchors, offset, partPrefix: `${slug}_${tag}_`, nodePrefix: `${tag.startsWith('E') ? 'e' : tag.toLowerCase()}_`, target, meshNames, tuning, slotRewrites, linkedNodes, fallbackGroup: bodyGroup, held: found.held, lateral, ownWheels: !!ownWheels });
     for (const [name, content] of Object.entries(t.parts)) files.push({ file: `${name}.jbeam`, part: name, text: serializeJbeam({ [name]: content }) });
-    foreign.push(...Object.values(t.parts));
+    foreign.push({ slot: foreignSlot, parts: Object.values(t.parts) });
     return t;
   };
   const axleSets: { index: number; t: ReturnType<typeof transplantSuspension> }[] = [];
@@ -570,6 +573,7 @@ export function buildJbeamFiles(fullDoc: Doc, tax: TaxonomyLookup, opts: JbeamEx
   }
   (fullDoc.axles ?? []).forEach((axle, i) => {
     if (!axle.fitted) return;
+    foreignSlot = `axle:${i}`;
     // This axle's suspensions (one is installed at a time) share names freely; they avoid the earlier axles'.
     const names = new Set<string>();
     const unique = { steer: axle.steer, used: new Set(usedNames), names };
@@ -622,6 +626,7 @@ export function buildJbeamFiles(fullDoc: Doc, tax: TaxonomyLookup, opts: JbeamEx
   const withBlends = (edits: PowertrainEdits | undefined) => (edits?.texts ? { ...edits, texts: resolveBlendTexts(edits.texts, slug, fullDoc.features?.sound?.blends ?? []) } : edits);
   if (pt?.engine) {
     const tags = engineTags(pt);
+    foreignSlot = 'engine';
     const t = bring(pt.engine.setId, pt.engine.sourceId, tags.get(pt.engine.sourceId) ?? 'E', mountNodes, pt.engine.tuning, rewritesFor(pt.engine.setId).rewrites, withBlends(pt.engine.edits), pt.engine.choices, undefined, gearboxNodes);
     if (t) {
       // One engine slot name whichever engine is the default (engines from different cars name theirs differently), so configurations keep working.
@@ -670,6 +675,7 @@ export function buildJbeamFiles(fullDoc: Doc, tax: TaxonomyLookup, opts: JbeamEx
   if (pt?.gearbox) {
     // Its beams to its own car's engine block go to the same points of the engine fitted here, by name
     // (by place, a block of another size left them on stand-ins bolted to the body).
+    foreignSlot = 'gearbox';
     const t = bring(pt.gearbox.setId, pt.gearbox.sourceId, 'G', [...engineNodes, ...mountNodes], pt.gearbox.tuning, undefined, pt.gearbox.edits, pt.gearbox.choices, undefined, blockOfEngine);
     // Without an engine of ours to plug into, the gearbox hangs off the body.
     if (t && !engineTransmissionSlots.length) extraSlots.push([t.rootSlotType, [t.rootSlotType], [], t.rootPart, 'Transmission']);
@@ -762,7 +768,7 @@ export function buildJbeamFiles(fullDoc: Doc, tax: TaxonomyLookup, opts: JbeamEx
     fuelStorages: [...new Set([pt?.engine, ...(pt?.alternates ?? [])].flatMap((e) => (e ? fuelStoragesOf(opts.suspensions?.[e.setId]?.parts ?? {}) : [])))],
   });
   for (const [name, content] of Object.entries(fx.parts)) files.push({ file: `${name}.jbeam`, part: name, text: serializeJbeam({ [name]: content }) });
-  foreign.push(...(Object.values(fx.parts) as JbeamObject[]));
+  foreign.push({ slot: 'features', parts: Object.values(fx.parts) as JbeamObject[] });
 
   const main: WritableObject = {
     [slug]: {
@@ -847,11 +853,17 @@ export function buildJbeamFiles(fullDoc: Doc, tax: TaxonomyLookup, opts: JbeamEx
     // The body carries the fitted suspensions' slots.
     // Plates and the hitch hang on the mount's slot, so every variant of it carries them.
     const featureSlots = doc.parts.filter((p) => slotTypeOf(doc.parts, p) === slotType).flatMap((p) => fx.partSlots.get(p.id) ?? []);
-    const moreSlots = [...(part.id === body?.id ? extraSlots : []), ...featureSlots];
+    // Every version of the body shell (a kit body is a variant of it) carries what the car hangs on it: the
+    // suspensions' and engine's slots, the features, the reference nodes and cameras; a kit body without them
+    // spawned as a shell on the ground with no wheels.
+    const bodyShell = !!body && (part.id === body.id || part.variantOf === body.id);
+    const moreSlots = [...(bodyShell ? extraSlots : []), ...featureSlots];
     if (moreSlots.length) content.slots2 = [...((content.slots2 as WritableValue[] | undefined) ?? [['name', 'allowTypes', 'denyTypes', 'default', 'description']]), ...moreSlots];
-    if (part.id === body?.id) Object.assign(content, fx.bodySections);
-    if (part.id === body?.id && doc.proxy.refNodes) {
-      const r = doc.proxy.refNodes;
+    if (bodyShell) Object.assign(content, fx.bodySections);
+    if (bodyShell && doc.proxy.refNodes) {
+      // The reference nodes were placed on the stock shell: a version without those node names places its own.
+      const ids = new Set(nodes.map((n) => n.id));
+      const r = Object.values(doc.proxy.refNodes).every((id) => ids.has(id)) ? doc.proxy.refNodes : (placeRefNodes(nodes) ?? doc.proxy.refNodes);
       content.refNodes = [['ref:', 'back:', 'left:', 'up:', 'leftCorner:', 'rightCorner:'], [r.ref, r.back, r.left, r.up, r.leftCorner, r.rightCorner]];
       content.cameraExternal = cameraFor(nodes);
       const internal = fullDoc.cameras?.length ? camerasInternalSection(fullDoc.cameras, nodes) : null;
@@ -939,7 +951,7 @@ function foreignBeams(part: JbeamObject): StabiliseBeam[] {
  * Every exported beam and node together, eased so no node is past what the game's 2000 Hz step holds
  * (see proxy/stability.ts). Our beams soften; the game's and hand-set ones stay, and their nodes get weight.
  */
-function softenForGame(doc: Doc, tax: TaxonomyLookup, ownNodes: (part: Part) => StructNode[], foreign: readonly JbeamObject[]): Softening & { softened: number; addedKg: number } {
+function softenForGame(doc: Doc, tax: TaxonomyLookup, ownNodes: (part: Part) => StructNode[], foreign: readonly { slot: string; parts: readonly JbeamObject[] }[]): Softening & { softened: number; addedKg: number } {
   const weights = new Map<string, number>();
   const ours: StructBeam[] = [];
   const list: StabiliseBeam[] = [];
@@ -973,7 +985,10 @@ function softenForGame(doc: Doc, tax: TaxonomyLookup, ownNodes: (part: Part) => 
       list.push({ id1: b.id1, id2: b.id2, spring, damp, fixed: handSet(b) });
     }
   }
-  const foreignList = foreign.flatMap(foreignBeams);
+  // Alternatives of one slot are never fitted together: per node, the one that loads it most counts, not their sum
+  // (fifteen engines' mounts summed onto the same nodes had the body weigh 2.7 t).
+  const slots = [...new Set(foreign.map((f) => f.slot))];
+  const foreignList = slots.flatMap((slot) => heaviestPerNode(foreign.filter((f) => f.slot === slot).map((f) => f.parts.flatMap(foreignBeams)), new Set(weights.keys())));
   const r = stabilise(weights, [...list, ...foreignList]);
   const beams = new Map<StructBeam, { k: number; c: number }>();
   ours.forEach((b, i) => {

@@ -1,4 +1,4 @@
-[SIZE=6][B]JBeam Forge: change list, 0.16.0 to 0.19.7[/B][/SIZE]
+[SIZE=6][B]JBeam Forge: change list, 0.16.0 to 0.19.8[/B][/SIZE]
 
 [B]Downloads:[/B] [URL='https://github.com/Connor-Moyle/jbeam-forge---Beam-NG-Car-creation-Tool/releases']GitHub Releases[/URL] (Windows installer and portable exe, Linux .deb and AppImage, the Blender add-on, and JBeam Forge for inside the game). The installer updates any earlier version in place; your settings, projects and library stay.
 [B]Bugs:[/B] [URL='https://github.com/Connor-Moyle/jbeam-forge---Beam-NG-Car-creation-Tool/issues']GitHub Issues[/URL]
@@ -6,6 +6,14 @@
 Project formats: 0.16 saves v25, 0.17 v26, 0.18 v27, 0.19 v28. Every version opens older projects; an older version can't open a project saved by a newer one.
 
 [HR][/HR]
+
+[SIZE=5][B]0.19.8[/B][/SIZE] — a body in kit versions keeps its running gear, and weighs what it should
+
+[LIST]
+[*]Only the stock body shell carried the suspensions' and engine's slots, the features, the reference nodes and cameras: a configuration on a kit shell spawned as a bare shell on the ground. Every version of the shell carries them now.
+[*]The weight the export adds under the game's stiff beams was summed for every engine and suspension that could be chosen at once (a car with fifteen engines had its body weigh 2.7 t and sat on its bump stops). Alternatives of one slot now count as the heaviest of them per node.
+[*]Traction control cut the throttle to 15% the moment the wheels turned at a standstill, so a car with a modest engine sat at 2,500 rpm on a slipping clutch. It leaves launches alone now and never cuts below 30%.
+[/LIST]
 
 [SIZE=5][B]0.19.7[/B][/SIZE] — engines you design keep their feet, and go by their own name
 

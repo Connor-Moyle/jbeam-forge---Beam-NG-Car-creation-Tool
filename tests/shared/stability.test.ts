@@ -112,3 +112,14 @@ describe('stability at the game physics rate', () => {
     expect(softenedValue(800_000, 1)).toBe(800_000);
   });
 });
+
+describe('heaviestPerNode', () => {
+  it('counts, per node, only the alternative that loads it most', async () => {
+    const { heaviestPerNode } = await import('@shared/proxy/stability');
+    const a: StabiliseBeam[] = [{ id1: 'n1', id2: 'x1', spring: 10, damp: 1, fixed: true }, { id1: 'n2', id2: 'x2', spring: 1, damp: 1, fixed: true }];
+    const b: StabiliseBeam[] = [{ id1: 'n1', id2: 'y1', spring: 3, damp: 1, fixed: true }, { id1: 'n2', id2: 'y2', spring: 7, damp: 1, fixed: true }];
+    const out = heaviestPerNode([a, b], new Set(['n1', 'n2']));
+    expect(out).toEqual([a[0], b[1]]);
+    expect(heaviestPerNode([a], new Set(['n1']))).toEqual(a);
+  });
+});
