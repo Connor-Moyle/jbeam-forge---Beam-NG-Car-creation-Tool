@@ -94,6 +94,47 @@ export function validateExport(doc: Doc, tax: TaxonomyLookup, input: ValidationI
     if (entry.openable && hasNodes && !doc.hinges.some((h) => h.partId === part.id)) warn('openable-unhinged', `${part.displayName} opens, but it has no hinge yet, so it is bolted shut. Add one in the Moving parts workspace (Hinge all does every opening panel at once).`, part.id);
   }
 
+  // Anything with no path of beams to the body falls off at spawn: a frame modelled as separate rails
+  // came out as two halves, and the rear half with everything hanging on it was an island of the car.
+  // Checked over the car as the default configuration builds it (base parts; a part and its variants
+  // may share node ids). Nodes on the same point (an unwelded seam) count as joined, as generation treats them.
+  {
+    const include = new Set(doc.parts.filter((p) => !p.variantOf).map((p) => p.id));
+    const nodes = doc.nodes.filter((n) => include.has(n.partId));
+    const root = new Map(nodes.map((n) => [n.id, n.id]));
+    const find = (x: string): string => {
+      while (root.get(x) !== x) {
+        root.set(x, root.get(root.get(x)!)!);
+        x = root.get(x)!;
+      }
+      return x;
+    };
+    for (const b of doc.beams) if (include.has(b.partId) && root.has(b.id1) && root.has(b.id2)) root.set(find(b.id1), find(b.id2));
+    const byPart = new Map<string, typeof nodes>();
+    for (const n of nodes) byPart.set(n.partId, [...(byPart.get(n.partId) ?? []), n]);
+    for (const own of byPart.values())
+      for (let i = 0; i < own.length; i++)
+        for (let j = i + 1; j < own.length; j++) {
+          const p = own[i]!;
+          const q = own[j]!;
+          if (find(p.id) !== find(q.id) && Math.hypot(p.pos[0] - q.pos[0], p.pos[1] - q.pos[1], p.pos[2] - q.pos[2]) < 0.02) root.set(find(p.id), find(q.id));
+        }
+    const members = new Map<string, typeof nodes>();
+    for (const n of nodes) members.set(find(n.id), [...(members.get(find(n.id)) ?? []), n]);
+    if (members.size > 1) {
+      const bodyNode = body && nodes.find((n) => n.partId === body.id);
+      const main = bodyNode ? find(bodyNode.id) : [...members.entries()].sort((a, b) => b[1].length - a[1].length)[0]![0];
+      for (const [island, list] of members) {
+        if (island === main) continue;
+        const count = new Map<string, number>();
+        for (const n of list) count.set(n.partId, (count.get(n.partId) ?? 0) + 1);
+        const names = [...count].map(([pid, c]) => `${c < (byPart.get(pid)?.length ?? 0) ? 'part of ' : ''}${partById.get(pid)?.displayName ?? pid}`);
+        const shown = names.length > 4 ? `${names.slice(0, 4).join(', ')} and ${names.length - 4} more` : names.join(', ');
+        warn('loose-piece', `${shown} (${list.length} nodes) ${names.length === 1 && !names[0]!.startsWith('part of') ? 'is' : 'are'} not attached to the car by any beam: in the game it would fall off at spawn. Regenerate the part${names.length === 1 ? '' : 's'} (pieces are bridged and attached), or join them in the JBeam workspace.`, list[0]!.partId);
+      }
+    }
+  }
+
   if (body && doc.nodes.some((n) => n.partId === body.id)) {
     const r = doc.proxy.refNodes;
     if (!r) err('refnodes-missing', 'The body has no refNodes: regenerate the body.');

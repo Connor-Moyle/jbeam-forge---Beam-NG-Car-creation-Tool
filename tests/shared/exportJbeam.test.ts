@@ -431,6 +431,20 @@ describe('validateExport', () => {
     expect(run(doc, meshes).warnings.map((w) => w.code)).not.toContain('part-empty');
   });
 
+  it('warns about a piece of a part that nothing holds (it would fall off in the game)', () => {
+    const { doc, meshes } = carProject();
+    expect(run(doc, meshes).warnings.map((w) => w.code)).not.toContain('loose-piece');
+    // Two hood nodes joined only to each other: a second piece of the hood, attached to nothing.
+    doc.nodes.push({ id: 'hx1', partId: 'p_hood', pos: [0.3, -1.2, 1.1], weight: 1 }, { id: 'hx2', partId: 'p_hood', pos: [-0.3, -1.2, 1.1], weight: 1 });
+    doc.beams.push({ id1: 'hx1', id2: 'hx2', partId: 'p_hood', kind: 'edge' });
+    const w = run(doc, meshes).warnings.find((x) => x.code === 'loose-piece');
+    expect(w?.partId).toBe('p_hood');
+    expect(w?.message).toMatch(/^part of Hood \(2 nodes\) are not attached to the car/);
+    // Tied to the body by one beam: no longer loose.
+    doc.beams.push({ id1: 'hx1', id2: doc.nodes.find((n) => n.partId === 'p_body')!.id, partId: 'p_hood', kind: 'attach' });
+    expect(run(doc, meshes).warnings.map((x) => x.code)).not.toContain('loose-piece');
+  });
+
   it('hard-fails the mistakes that made the old build invisible or broken', () => {
     const { doc, meshes } = carProject();
     // 1. flexbody mesh missing from the DAE
