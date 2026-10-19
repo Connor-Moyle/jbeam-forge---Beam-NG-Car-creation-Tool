@@ -68,6 +68,18 @@ describe('hinge geometry', () => {
     expect(hingeEdge([[0, -1.5, 1], [0.7, -1.5, 1]], bonnet)).toBeNull(); // across the middle: no edge
   });
 
+  it('hinges a sunroof along its front edge, and never puts both hinge points on one node', () => {
+    const roof: [number, number, number][] = [];
+    for (const x of [-0.4, 0, 0.4]) for (const y of [-0.6, -0.3, 0]) roof.push([x, y, 1.4]);
+    const g = guessHinge('sunroof', roof, [[0, 0, 0.5]]);
+    expect(g.axis.map((p) => p[1])).toEqual([-0.6, -0.6]);
+    expect(g.axis.map((p) => p[0]).sort()).toEqual([-0.4, 0.4]);
+    expect(g.latch?.[1]).toBe(0);
+    // A flat panel of a kind with no rule of its own (the door rule): still two distinct hinge points.
+    const flat = guessHinge('fuel_door', roof, [[0, 0, 0.5]]);
+    expect(Math.hypot(...flat.axis[0].map((v, i) => v - flat.axis[1][i]!))).toBeGreaterThan(0.1);
+  });
+
   it('sizes the limiter bound from the opening angle', () => {
     // Far edge 1 m from a vertical axis, anchored on the axis: length never changes → minimal bound.
     expect(limiterBound([0, 1, 0], [0, 0, 0], [[0, 0, 0], [0, 0, 1]], 70)).toBeCloseTo(0.01);

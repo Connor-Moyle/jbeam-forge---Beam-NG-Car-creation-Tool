@@ -323,8 +323,9 @@ function ownNodes(model: SimModel, partId: string): number[] {
     const mine = (i: number) => model.nodePart![i] === partId;
     // Nodes of the part that are bolted rigidly to the body (the latch's body half) stay with the body.
     const bodyLinks = new Uint16Array(model.mass.length);
+    const latch = new Set(model.latches ?? []);
     for (let b = 0; b < model.beamA.length; b++) {
-      if (model.beamType[b] !== 0 || model.breakGroup[b]! >= 0) continue;
+      if (model.beamType[b] !== 0 || model.breakGroup[b]! >= 0 || latch.has(b)) continue; // a latch lets go: not a bolt
       const a = model.beamA[b]!;
       const c = model.beamB[b]!;
       if (mine(a) && !mine(c)) bodyLinks[a]!++;
@@ -371,8 +372,14 @@ function unlatched(model: SimModel, partId: string): SimModel {
   if (!mine.length) return model;
   const spring = Float64Array.from(model.spring);
   const damp = Float64Array.from(model.damp);
-  for (const k of mine) spring[k] = damp[k] = 0;
-  return { ...model, spring, damp };
+  const expansionLimit = Float64Array.from(model.expansionLimit);
+  const compressionLimit = Float64Array.from(model.compressionLimit);
+  for (const k of mine) {
+    spring[k] = damp[k] = 0;
+    expansionLimit[k] = Infinity; // nor may its length limits hold the part
+    compressionLimit[k] = 0;
+  }
+  return { ...model, spring, damp, expansionLimit, compressionLimit };
 }
 
 /** Hold everything but the hinged part where it is (a test rig), with no ground in the way. */

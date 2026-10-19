@@ -4244,12 +4244,12 @@ const scenarios = [
       await page.getByTestId('toolbar-generate').click();
       for (let i = 0; i < 1800 && !((await hook(page, 'projectDoc')).nodes.length > 50); i++) await page.waitForTimeout(100);
       await page.waitForTimeout(1500);
-      // The generated project, for offline physics checks (scripts/dev/simParts.mts): before the hinges, whose latches are the game's couplers, which the stands check doesn't model.
-      writeFileSync(join(outDir, 'practice-doc.json'), JSON.stringify(await hook(page, 'projectDoc')));
       // Every door, the hood and the trunk hinged (variants are covered by the showcase estate's Sport hood).
       await hook(page, 'hingeAll');
       const hinged = (await hook(page, 'projectDoc')).hinges.length;
       assert(hinged >= 4, `Hinge all hinges the doors, hood and trunk (${hinged})`);
+      // The generated project, for offline physics checks (scripts/dev/simParts.mts): hinged, since the sandbox holds latched parts shut as the game does.
+      writeFileSync(join(outDir, 'practice-doc.json'), JSON.stringify(await hook(page, 'projectDoc')));
       await page.getByTestId('toolbar-export').click();
       await page.getByTestId('export-dialog').waitFor();
       await shot(page, 'practice-export-dialog');

@@ -11,6 +11,8 @@ Project formats: 0.16 saves v25, 0.17 v26, 0.18 v27, 0.19 v28. Every version ope
 
 [LIST]
 [*]A part whose parent reaches only one edge of it (a windscreen on a tub, a cage standing on the body, a roof-edge wing) was held along that line and pivoted about it. Its far end now holds on to a rigid neighbour under the same parent (a roof, a cage, a fixed panel; never a door, glass, a light or an add-on). Regenerate to get the new attachments.
+[*]A part modelled as separate shells (a frame of rails and cross-members, a cage of tubes) came out as disconnected islands; generation now bridges them, so a frame no longer breaks in two at spawn.
+[*]Sunroofs hinge along their front edge and latch at the rear; a flat panel no longer gets both hinge points on one node (a zero-size beam in the jbeam).
 [*]The Testing workspace's settle test holds doors, bonnets and tailgates shut as the game's latch does (they used to fall open), and its jack stands no longer pick a diffuser's featherweight node or blow it up.
 [*]A light sharing its material with other parts can't glow; the export's warning now has [B]Give the lights their own material[/B], which copies the material onto the light meshes only ("…_light") so the glow map can use it. The practice car exports with no warnings now.
 [/LIST]

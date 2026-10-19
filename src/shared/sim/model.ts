@@ -44,13 +44,19 @@ export function buildSimModel(doc: Doc, tax: TaxonomyLookup, parts: readonly Par
   });
 
   const own = doc.beams.filter((b) => include.has(b.partId) && index.has(b.id1) && index.has(b.id2));
-  // Latches: the game's coupler holds each auto-latching part shut from spawn; here a mount beam between
-  // the latch pair, letting go at the latch's strength (a settle test would otherwise drop every door open).
+  // Latches: the game's coupler holds each auto-latching part shut from spawn. The latch pair sits at one
+  // point, so a beam between the two would have no length: the part's half takes copies of the body half's
+  // mount beams instead, letting go at the latch's strength (a settle test would otherwise drop every door open).
   const latches: StructBeam[] = [];
   for (const h of doc.hinges ?? []) {
     if (!h.autoLatch || !h.latch || !include.has(h.partId)) continue;
     const ids = hingeIds(doc, h.partId);
-    if (ids.latchPart && ids.latchBody && index.has(ids.latchPart) && index.has(ids.latchBody)) latches.push({ id1: ids.latchPart, id2: ids.latchBody, partId: h.partId, kind: 'mount' });
+    if (!ids.latchPart || !ids.latchBody || !index.has(ids.latchPart)) continue;
+    for (const b of own) {
+      if (b.partId !== h.partId || b.kind !== 'mount') continue;
+      const other = b.id1 === ids.latchBody ? b.id2 : b.id2 === ids.latchBody ? b.id1 : null;
+      if (other && other !== ids.latchPart) latches.push({ id1: ids.latchPart, id2: other, partId: h.partId, kind: 'mount' });
+    }
   }
   const beams = [...own, ...latches];
   const m = beams.length;

@@ -344,7 +344,65 @@ export function deriveStructure(input: DeriveInput): DerivedStructure {
   nodes.push(...added);
   // (Not for a part set to no bracing: that is the modder's choice.)
   if (input.bracing !== 'none') beams.push(...holdEveryWay(nodes, beams, partId));
+  // A part modelled as separate shells (a frame of rails and cross-members, a cage of tubes) has edges within
+  // each shell and none between: in the game the pieces would fall apart. Bridged, whatever the bracing.
+  beams.push(...bridgeIslands(nodes, beams, partId));
   return { nodes, beams, tris, warnings };
+}
+
+/** Beams joining each island to the island nearest it, by this many closest node pairs. */
+const BRIDGE_LINKS = 3;
+
+/**
+ * Beams that join a part's disconnected islands (no path of beams between them) into one piece: each
+ * island beyond the largest ties to its nearest other island by its closest node pairs.
+ */
+export function bridgeIslands(nodes: readonly StructNode[], beams: readonly StructBeam[], partId: string): StructBeam[] {
+  const index = new Map(nodes.map((n, i) => [n.id, i]));
+  const parent = nodes.map((_, i) => i);
+  const find = (x: number): number => {
+    while (parent[x] !== x) {
+      parent[x] = parent[parent[x]!]!;
+      x = parent[x]!;
+    }
+    return x;
+  };
+  const join = (a: number, b: number) => void (parent[find(a)] = find(b));
+  const d = (a: StructNode, b: StructNode) => Math.hypot(a.pos[0] - b.pos[0], a.pos[1] - b.pos[1], a.pos[2] - b.pos[2]);
+  for (const b of beams) {
+    const a = index.get(b.id1);
+    const c = index.get(b.id2);
+    if (a !== undefined && c !== undefined) join(a, c);
+  }
+  // Nodes on the same point (an unwelded seam) count as one: a beam between them would have no length.
+  for (let i = 0; i < nodes.length; i++) for (let j = i + 1; j < nodes.length; j++) if (find(i) !== find(j) && d(nodes[i]!, nodes[j]!) < MIN_ATTACH_LENGTH) join(i, j);
+  const out: StructBeam[] = [];
+  const seen = new Set(beams.map((b) => `${b.id1}|${b.id2}`));
+  for (let guard = 0; guard < nodes.length; guard++) {
+    const islands = new Map<number, number[]>();
+    nodes.forEach((_, i) => islands.set(find(i), [...(islands.get(find(i)) ?? []), i]));
+    if (islands.size < 2) break;
+    const [small, ...rest] = [...islands.values()].sort((a, b) => a.length - b.length);
+    // The closest node pairs between the smallest island and any other.
+    const pairs: { a: number; b: number; L: number }[] = [];
+    for (const a of small!) for (const other of rest) for (const b of other) pairs.push({ a, b, L: d(nodes[a]!, nodes[b]!) });
+    pairs.sort((x, y) => x.L - y.L);
+    const usedA = new Set<number>();
+    let added = 0;
+    for (const p of pairs) {
+      if (added >= BRIDGE_LINKS) break;
+      if (p.L < MIN_ATTACH_LENGTH || (usedA.has(p.a) && added > 0)) continue;
+      const key = `${nodes[p.a]!.id}|${nodes[p.b]!.id}`;
+      if (seen.has(key)) continue;
+      seen.add(key);
+      usedA.add(p.a);
+      out.push({ id1: nodes[p.a]!.id, id2: nodes[p.b]!.id, partId, kind: 'brace' });
+      join(p.a, p.b);
+      added++;
+    }
+    if (!added) break; // nothing joinable (nodes on top of each other): leave it
+  }
+  return out;
 }
 
 /** Beyond this gap (m) a part is "far from its parent": attachment is minimal and a warning is raised. */

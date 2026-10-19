@@ -77,6 +77,11 @@ export function guessHinge(kind: string, part: readonly Pt[], body: readonly Pt[
     const rear = band(1, 'hi');
     axis = [argBy(rear, (p) => p[0]), argBy(rear, (p) => -p[0])];
     latch = argBy(band(1, 'lo'), (p) => Math.abs(p[0]));
+  } else if (kind === 'sunroof') {
+    // Tilts up at the rear, hinged along its front edge (a flat panel: the door rule below would find no height to hinge on).
+    const front = band(1, 'lo');
+    axis = [argBy(front, (p) => p[0]), argBy(front, (p) => -p[0])];
+    latch = argBy(band(1, 'hi'), (p) => Math.abs(p[0]));
   } else if (kind === 'trunk') {
     const front = band(1, 'lo');
     axis = [argBy(front, (p) => p[0]), argBy(front, (p) => -p[0])];
@@ -98,6 +103,11 @@ export function guessHinge(kind: string, part: readonly Pt[], body: readonly Pt[
     if (Math.abs(axis[0][2] - axis[1][2]) < size[2] * 0.25) {
       const all = band(1, 'lo', 0.15);
       axis = [argBy(all, (p) => p[2]), argBy(all, (p) => -p[2])];
+    }
+    // A flat panel lying down (a hatch in a floor) has no height at its edge: hinge across it instead, never on one point twice.
+    if (dist(axis[0], axis[1]) < 0.02) {
+      const all = band(1, 'lo', 0.15);
+      axis = [argBy(all, (p) => p[0]), argBy(all, (p) => -p[0])];
     }
     const rear = band(1, 'hi', 0.15);
     const latchZ = lo[2] + size[2] * 0.45;

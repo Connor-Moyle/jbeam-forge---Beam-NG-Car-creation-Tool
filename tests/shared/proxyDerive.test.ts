@@ -4,10 +4,10 @@ import { TaxonomyFileSchema } from '../../src/shared/taxonomy/schema';
 import { Classifier } from '../../src/shared/taxonomy/classify';
 import { createEmptyProject } from '../../src/shared/project/io';
 import { createPart } from '../../src/shared/parts/ops';
-import type { StructNode } from '../../src/shared/project/schema';
+import type { StructBeam, StructNode } from '../../src/shared/project/schema';
 import { meshoptReady } from '../../src/shared/proxy/shapes';
 import type { ProxyMesh } from '../../src/shared/proxy/mesh';
-import { attachToParent, isFlat, braces, deriveStructure, nameNodes, placeRefNodes, positionTag, predictStability, STABILITY_OK } from '../../src/shared/proxy/derive';
+import { attachToParent, bridgeIslands, isFlat, braces, deriveStructure, nameNodes, placeRefNodes, positionTag, predictStability, STABILITY_OK } from '../../src/shared/proxy/derive';
 import { defaultProxySettings, generateStructure, removePartStructure, structureTotals, swapSafeParentNodes } from '../../src/shared/proxy/generate';
 import { kindDefaults, targetVertices } from '../../src/shared/proxy/presets';
 
@@ -133,6 +133,18 @@ describe('derivation', () => {
     expect(top.length).toBeGreaterThan(0);
     expect(top.every((b) => b.id2.startsWith('r'))).toBe(true); // on the roof, not on a long beam down to the tub
     expect(held.filter((b) => b.id1.startsWith('b')).every((b) => b.id2.startsWith('p'))).toBe(true); // the bottom still on the tub
+  });
+
+  it('bridges the islands of a part modelled as separate shells (a frame of rails and cross-members)', () => {
+    // Two boxes 0.1 m apart with edges only within each.
+    const a = [node('a1', 0, 0, 0), node('a2', 1, 0, 0), node('a3', 0, 1, 0), node('a4', 1, 1, 0)];
+    const b = [node('b1', 0, 1.1, 0), node('b2', 1, 1.1, 0), node('b3', 0, 2, 0), node('b4', 1, 2, 0)];
+    const beams: StructBeam[] = [...['a1|a2', 'a2|a4', 'a4|a3', 'a3|a1', 'b1|b2', 'b2|b4', 'b4|b3', 'b3|b1'].map((k) => ({ id1: k.split('|')[0]!, id2: k.split('|')[1]!, partId: 'f', kind: 'edge' as const }))];
+    const bridge = bridgeIslands([...a, ...b], beams, 'f');
+    expect(bridge.length).toBeGreaterThanOrEqual(2);
+    expect(bridge.every((x) => x.kind === 'brace' && x.id1.startsWith('a') !== x.id2.startsWith('a'))).toBe(true); // across the gap
+    expect(bridge.some((x) => (x.id1 === 'a3' && x.id2 === 'b1') || (x.id1 === 'b1' && x.id2 === 'a3'))).toBe(true); // the closest pair
+    expect(bridgeIslands([...a, ...b], [...beams, ...bridge], 'f')).toEqual([]); // one piece now
   });
 
   it('skips parent nodes a few millimetres away (a beam that short shakes)', () => {
