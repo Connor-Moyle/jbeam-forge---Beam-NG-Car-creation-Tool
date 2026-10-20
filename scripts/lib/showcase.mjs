@@ -302,11 +302,13 @@ export async function showcaseBuild({ page, base, plan, model, hook, shot, asser
   }
   await page.waitForSelector('[data-view=home][data-testid=app-ready]');
   await invoke('settings:update', { beamngInstallDir: realInstall, offerLessons: false });
-  for (let i = 0; i < 3000; i++) {
+  // A fresh userData cuts the game's parts first: over 7 minutes since the game's 0.40.
+  for (let i = 0; i < 9000; i++) {
     const lib = await invoke('library:status');
     if (!lib.scanning && (await invoke('suspension:catalogue')).length) break;
     await page.waitForTimeout(100);
   }
+  assert((await invoke('suspension:catalogue')).length > 0, 'the game scan finished and the catalogue has sets');
   // Import and sort.
   await page.getByTestId('home-new').click();
   await page.getByTestId('newmod-name').fill(plan.name);

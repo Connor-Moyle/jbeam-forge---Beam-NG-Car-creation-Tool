@@ -40,5 +40,5 @@ describe('SettingsModal', () => {
     expect(await screen.findByTestId('beamng-status')).toBeInTheDocument();
     expect(screen.getByTestId('settings-save')).toBeEnabled();
     invoke.mockReset();
-  });
+  }, 60_000); // typing through fake timers passes in a second alone and in 20+ under the whole suite's load
 });

@@ -22,6 +22,7 @@ import { exportableProps, propRow, PROPS_HEADER } from '../props/props';
 import type { PartScripts } from '../lua/export';
 import { applyDrivetrainToAxle, applyDrivetrainToGearbox, DEFAULT_DRIVETRAIN, planDrivetrain, renameClashingNames } from '../powertrain/drivetrain';
 import { camerasInternalSection } from '../cameras/cameras';
+import { seatIds, seatOccupantSlot, type Hand } from './occupants';
 import { applyChoices, type SetChoices, type SetOptions } from '../suspension/options';
 import { latchEvents, latchKindOf, resolveBlendTexts } from '../sound/blend';
 import { buildFeatureParts } from './features';
@@ -737,6 +738,13 @@ export function buildJbeamFiles(fullDoc: Doc, tax: TaxonomyLookup, opts: JbeamEx
     const nodes = entry && partRole(entry, partSettings(doc, part, entry)) === 'own' ? doc.nodes.filter((n) => n.partId === part.id) : [];
     return isShell(part) ? nodes.map((n) => ({ ...n, weight: Math.max(0.5, Math.round(n.weight * SHELL_WEIGHT * 1000) / 1000), options: { ...n.options, collision: false, selfCollision: false } })) : nodes;
   };
+  // The game's physical occupants (0.40): every seat with structure seats one; the driver's is the
+  // front seat on the driver camera's side.
+  const isSeat = (p: Part) => ['seat', 'rear_seat'].includes(tax.entry(p.taxonomyId)?.id ?? '') && ownNodes(p).length >= 4;
+  const seatIdOf = seatIds(doc.parts.filter((p) => !p.variantOf && isSeat(p)).map((p) => ({ id: p.id, nodes: ownNodes(p) })));
+  const driverCam = fullDoc.cameras?.find((c) => c.type === 'driver');
+  const hand: Hand = driverCam && driverCam.pos[0] < 0 ? 'RHD' : 'LHD';
+  const driverSeat = [...seatIdOf].find(([, id]) => id === (hand === 'RHD' ? 'FR' : 'FL'))?.[0] ?? null;
   // With a game suspension on an axle, that axle's own wheels, tyres and brakes ride on the game's wheel:
   // the rim and disc spin with its hub, the tyre with its tyre, the caliper steers with the knuckle.
   const wheelGroups = new Map<string, string[]>();
@@ -843,6 +851,8 @@ export function buildJbeamFiles(fullDoc: Doc, tax: TaxonomyLookup, opts: JbeamEx
     const group = nodes.length ? slotType : flexGroupOf(doc, part);
     const groups = !nodes.length ? wheelGroups.get(part.id) : undefined;
     const meshes = meshesOf(part.id);
+    const seatId = nodes.length >= 4 ? seatIdOf.get(part.variantOf ?? part.id) : undefined;
+    const occupant = seatId ? seatOccupantSlot(seatId, part.displayName, nodes, { driver: (part.variantOf ?? part.id) === driverSeat ? hand : null, mesh: meshes[0] }) : null;
 
     const content: Record<string, WritableValue> = {
       information: { authors: opts.author || 'JBeam Forge', name: part.displayName, value: partPrice(part, entry) },
@@ -857,7 +867,7 @@ export function buildJbeamFiles(fullDoc: Doc, tax: TaxonomyLookup, opts: JbeamEx
     // suspensions' and engine's slots, the features, the reference nodes and cameras; a kit body without them
     // spawned as a shell on the ground with no wheels.
     const bodyShell = !!body && (part.id === body.id || part.variantOf === body.id);
-    const moreSlots = [...(bodyShell ? extraSlots : []), ...featureSlots];
+    const moreSlots = [...(bodyShell ? extraSlots : []), ...featureSlots, ...(occupant ? [occupant] : [])];
     if (moreSlots.length) content.slots2 = [...((content.slots2 as WritableValue[] | undefined) ?? [['name', 'allowTypes', 'denyTypes', 'default', 'description']]), ...moreSlots];
     if (bodyShell) Object.assign(content, fx.bodySections);
     if (bodyShell && doc.proxy.refNodes) {
@@ -866,7 +876,9 @@ export function buildJbeamFiles(fullDoc: Doc, tax: TaxonomyLookup, opts: JbeamEx
       const r = Object.values(doc.proxy.refNodes).every((id) => ids.has(id)) ? doc.proxy.refNodes : (placeRefNodes(nodes) ?? doc.proxy.refNodes);
       content.refNodes = [['ref:', 'back:', 'left:', 'up:', 'leftCorner:', 'rightCorner:'], [r.ref, r.back, r.left, r.up, r.leftCorner, r.rightCorner]];
       content.cameraExternal = cameraFor(nodes);
-      const internal = fullDoc.cameras?.length ? camerasInternalSection(fullDoc.cameras, nodes) : null;
+      // A seat's occupant brings the driver's and passengers' views: the stock cars leave those cameras out.
+      const cams = (fullDoc.cameras ?? []).filter((c) => !(c.type === 'driver' && driverSeat) && !(c.type === 'passenger' && seatIdOf.size > (driverSeat ? 1 : 0)));
+      const internal = cams.length ? camerasInternalSection(cams, nodes) : null;
       if (internal) content.camerasInternal = internal;
     }
     const glass = entry.beamPreset === 'glass_brittle' && nodes.length > 0;
@@ -894,7 +906,8 @@ export function buildJbeamFiles(fullDoc: Doc, tax: TaxonomyLookup, opts: JbeamEx
     const posOf = (id: string) => nodePos.get(id);
     if (beams.length) content.beams = beamsSection(part, beams, preset, settings.attachment, hinge, posOf, partVars, glass, softening, shell);
     const aero = AERO[part.taxonomyId];
-    if (tris.length) content.triangles = trianglesSection(tris, slotType, preset, aero && { ...aero, pos: posOf, downforce: partVars.downforce });
+    // A seat's triangles wrap its mesh's hull, where the occupant sits: they would push the body out.
+    if (tris.length && !occupant) content.triangles = trianglesSection(tris, slotType, preset, aero && { ...aero, pos: posOf, downforce: partVars.downforce });
     if (hinge && nodes.length) Object.assign(content, hingeSections(doc, part, hinge, nodes));
     const clickable = (doc.triggers ?? []).filter((t) => t.partId === part.id);
     if (clickable.length && nodes.length >= 3) addTriggers(content, clickable, nodes);

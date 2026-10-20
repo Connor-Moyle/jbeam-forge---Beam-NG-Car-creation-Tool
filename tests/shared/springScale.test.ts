@@ -40,6 +40,33 @@ describe('springs scaled to the car’s weight', () => {
     expect(scaleSprings(parts, 1).car_strut_F).toBe(parts.car_strut_F);
   });
 
+  it("scales exactly the beams the game's 0.40 tags as springs and dampers, whatever their part's name", () => {
+    const tagged: Record<string, JbeamObject> = {
+      car_suspension_R: {
+        beams: [
+          ['id1:', 'id2:'],
+          { beamSpring: 5001000, beamDamp: 250 },
+          ['rh1r', 'rs2r'], // structure, untagged
+          { beamSpring: 20000, beamDamp: 0 },
+          { beamLimitSpring: 34000, beamLimitDamp: 1000 },
+          ['rh4r', 'rs1r', { vkTag: 'spring_RR', name: 'spring_RR', precompressionRange: 0.13 }],
+          { beamSpring: 0, beamDamp: 2736 },
+          ['rh1r', 'rs1r', { vkTag: 'damper_RR', name: 'damper_RR', beamDampFast: 1900, beamDampRebound: 5473 }],
+          { beamSpring: 30000, beamDamp: 100 },
+          ['rh1r', 'rh2r', { vkTag: 'link_RR' }], // a control arm: not a spring
+        ],
+      },
+      car_strut_F: parts.car_strut_F!,
+    };
+    const out = scaleSprings(tagged, 2);
+    const beams = out.car_suspension_R!.beams as unknown[];
+    expect(beams[3]).toEqual({ beamSpring: 20000, beamDamp: 0 }); // the option row stays; the beam carries its rate
+    expect((beams[5] as unknown[])[2]).toEqual({ vkTag: 'spring_RR', name: 'spring_RR', precompressionRange: 0.13, beamSpring: 40000 });
+    expect((beams[7] as unknown[])[2]).toEqual({ vkTag: 'damper_RR', name: 'damper_RR', beamDampFast: 3800, beamDampRebound: 10946, beamDamp: 5472 });
+    expect((beams[9] as unknown[])[2]).toEqual({ vkTag: 'link_RR' });
+    expect(out.car_strut_F).toBe(parts.car_strut_F); // tagged content: the name no longer decides
+  });
+
   it('is applied through the axle’s edits', () => {
     const edits = emptyEdits();
     edits.fields[SPRING_SCALE] = 1.5;

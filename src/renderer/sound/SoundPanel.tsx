@@ -238,11 +238,20 @@ function CarSounds() {
   const sound = useProjectStore((s) => s.doc?.features.sound) ?? emptySound();
   const [list, setList] = useState<{ part: string; label: string }[]>([]);
   useEffect(() => {
-    horns ??= call('beamng:horns').catch(() => []);
-    void horns.then((got) => {
-      if (!got.length) horns = null;
-      setList(got);
-    });
+    // An empty list is asked for again (the game folder may have been set, or its scan still running).
+    let tries = 0;
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    const fetch = () => {
+      horns ??= call('beamng:horns').catch(() => []);
+      void horns.then((got) => {
+        setList(got);
+        if (got.length) return;
+        horns = null;
+        if (tries++ < 5) timer = setTimeout(fetch, 3000);
+      });
+    };
+    fetch();
+    return () => clearTimeout(timer);
   }, []);
   const cabin = sound.cabinFilterCoef;
   return (

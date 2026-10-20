@@ -2670,7 +2670,7 @@ const scenarios = [
       await page.waitForSelector('[data-testid=app-ready]');
       const invoke = (channel, req) => page.evaluate(async ([c, r]) => (await window.forge.invoke(c, r)).value, [channel, req]);
       await invoke('settings:update', { beamngInstallDir: realInstall, offerLessons: false });
-      for (let i = 0; i < 3000; i++) {
+      for (let i = 0; i < 9000; i++) {
         const lib = await invoke('library:status');
         if (!lib.scanning && (await invoke('suspension:catalogue')).length) break;
         await page.waitForTimeout(100);
@@ -2855,7 +2855,7 @@ const scenarios = [
       if (realInstall) {
         const invoke = (channel, req) => page.evaluate(async ([c, r]) => (await window.forge.invoke(c, r)).value, [channel, req]);
         await invoke('settings:update', { beamngInstallDir: realInstall });
-        for (let i = 0; i < 3000; i++) {
+        for (let i = 0; i < 9000; i++) {
           const lib = await invoke('library:status');
           if (!lib.scanning && (await invoke('suspension:catalogue')).length) break;
           await page.waitForTimeout(100);
@@ -3121,7 +3121,7 @@ const scenarios = [
       await page.waitForSelector('[data-view=home][data-testid=app-ready]');
       const invoke = (channel, req) => page.evaluate(async ([c, r]) => (await window.forge.invoke(c, r)).value, [channel, req]);
       await invoke('settings:update', { beamngInstallDir: realInstall });
-      for (let i = 0; i < 1800; i++) {
+      for (let i = 0; i < 9000; i++) {
         const lib = await invoke('library:status');
         if (!lib.scanning && (await invoke('suspension:catalogue')).length) break;
         await page.waitForTimeout(100);

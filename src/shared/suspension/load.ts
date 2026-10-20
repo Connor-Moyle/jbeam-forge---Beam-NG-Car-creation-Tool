@@ -36,6 +36,9 @@ export function springScaleFor(carKg: number | null | undefined, donorKg: number
 
 /** The set's spring and damper parts: struts, coilovers, springs (leaf, coil, air), shocks. */
 export const SPRING_PART = /strut|coilover|coil|spring|shock|damper|airbag|leaf/i;
+/** The game's kinematics tag (0.40) on a spring or damper beam: spring_FL, damper_RR… */
+const SPRING_TAG = /^(spring|damper)_/;
+const springTagged = (o: JbeamObject) => typeof o.vkTag === 'string' && SPRING_TAG.test(o.vkTag);
 /** Springs and bump stops sit below this rate (N/m); the parts' structural beams above it. */
 const STRUCTURAL_SPRING = 1e6;
 const DAMPING_KEYS = ['beamDamp', 'beamDampRebound', 'beamDampFast', 'beamDampReboundFast'] as const;
@@ -56,9 +59,32 @@ export function scaleSprings(parts: Readonly<Record<string, JbeamObject>>, k: nu
     return out;
   };
   const out: Record<string, JbeamObject> = { ...parts };
+  // Since the game's 0.40 every spring and damper beam is tagged (vkTag spring_FL, damper_RR…): scale
+  // exactly those, wherever they are, with the rate their preceding option rows gave them written
+  // on the beam itself. Older content goes by the part's name.
+  const tagged = Object.values(parts).some((p) => Array.isArray(p.beams) && p.beams.some((row) => Array.isArray(row) && row.some((c) => isJbeamObject(c) && springTagged(c))));
   for (const [name, body] of Object.entries(parts)) {
-    if (!SPRING_PART.test(name) || !Array.isArray(body.beams)) continue;
-    out[name] = { ...body, beams: body.beams.map((row, i) => (i === 0 ? row : isJbeamObject(row) ? scaleOptions(row) : Array.isArray(row) ? row.map((c) => (isJbeamObject(c) ? scaleOptions(c) : c)) : row)) };
+    if (!Array.isArray(body.beams) || (!tagged && !SPRING_PART.test(name))) continue;
+    if (!tagged) {
+      out[name] = { ...body, beams: body.beams.map((row, i) => (i === 0 ? row : isJbeamObject(row) ? scaleOptions(row) : Array.isArray(row) ? row.map((c) => (isJbeamObject(c) ? scaleOptions(c) : c)) : row)) };
+      continue;
+    }
+    let cur: JbeamObject = {};
+    let changed = false;
+    const beams = body.beams.map((row, i) => {
+      if (i === 0) return row;
+      if (isJbeamObject(row)) cur = { ...cur, ...row };
+      if (!Array.isArray(row)) return row;
+      const inline = row.find((c): c is JbeamObject => isJbeamObject(c));
+      if (!inline || !springTagged(inline)) return row;
+      const merged = { ...cur, ...inline };
+      const scaled = scaleOptions(merged);
+      const own = { ...inline };
+      for (const key of ['beamSpring', ...DAMPING_KEYS] as const) if (scaled[key] !== merged[key]) own[key] = scaled[key]!;
+      changed = true;
+      return row.map((c) => (c === inline ? own : c));
+    });
+    if (changed) out[name] = { ...body, beams };
   }
   return out;
 }

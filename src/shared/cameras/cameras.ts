@@ -64,7 +64,8 @@ type Cell = string | number | Record<string, number | boolean>;
 export function camerasInternalSection(cameras: readonly InternalCamera[], nodes: readonly { id: string; pos: readonly number[] }[]): (Cell[] | Record<string, number | boolean>)[] | null {
   const rows = cameras.flatMap((c) => {
     const ids = cameraAnchors(nodes, c.pos);
-    return ids ? [[c.type, c.pos[0], c.pos[1], c.pos[2], c.fov, ...ids] as Cell[]] : [];
+    // The game (0.40) tells inside from outside by this flag, not by the camera's name.
+    return ids ? [[c.type, c.pos[0], c.pos[1], c.pos[2], c.fov, ...ids, ...(c.type === 'hood' ? [] : [{ isInside: true }])] as Cell[]] : [];
   });
   if (!rows.length) return null;
   return [['type', 'x', 'y', 'z', 'fov', 'id1:', 'id2:', 'id3:', 'id4:', 'id5:', 'id6:'], { ...CAMERA_NODE_SETTINGS }, ...rows];

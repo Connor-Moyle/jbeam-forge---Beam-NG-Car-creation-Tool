@@ -1,4 +1,4 @@
-[SIZE=6][B]JBeam Forge: change list, 0.16.0 to 0.19.8[/B][/SIZE]
+[SIZE=6][B]JBeam Forge: change list, 0.16.0 to 0.19.9[/B][/SIZE]
 
 [B]Downloads:[/B] [URL='https://github.com/Connor-Moyle/jbeam-forge---Beam-NG-Car-creation-Tool/releases']GitHub Releases[/URL] (Windows installer and portable exe, Linux .deb and AppImage, the Blender add-on, and JBeam Forge for inside the game). The installer updates any earlier version in place; your settings, projects and library stay.
 [B]Bugs:[/B] [URL='https://github.com/Connor-Moyle/jbeam-forge---Beam-NG-Car-creation-Tool/issues']GitHub Issues[/URL]
@@ -6,6 +6,16 @@
 Project formats: 0.16 saves v25, 0.17 v26, 0.18 v27, 0.19 v28. Every version opens older projects; an older version can't open a project saved by a newer one.
 
 [HR][/HR]
+
+[SIZE=5][B]0.19.9[/B][/SIZE] — BeamNG.drive 0.40, with people in the seats
+
+[LIST]
+[*]Checked against the game's 0.40 (19 October 2026): the parts library cuts its 57 vehicles (the Percheron and the European trailers are new), the game Lua the scripts call is unchanged, and the Skyline showcase rebuilt on 0.40 spawns all 25 configurations clean (17 pull away under the hands-off launch probe; the rest sit with the engine running, as some did on 0.39).
+[*]0.40's common.zip has grown past 4 GB and listing it took 13 seconds inside the app, so the wheel picker and the horn list came up empty. The zip's tail is read in one go now (a tenth of a second), and the first scan's sets load in parallel, three minutes sooner.
+[*]0.40's physical occupants: every seat part carries the game's seat_occupant slot, so a body sits in it (89 kg, leans with the car, carries the camera, and is how you get in on foot). The occupant sits 30 cm behind the cushion's front edge, reclined 15°, held by six of the seat's nodes; the front seat on the driver camera's side is the driver's. The driver and passenger cameras come from the occupants now; the hood camera stays.
+[*]0.40 tags every spring and damper beam (vkTag): the spring scale for a suspension from a much lighter or heavier car now scales exactly those beams. Older game content scales as before.
+[*]Interior cameras carry the game's isInside flag.
+[/LIST]
 
 [SIZE=5][B]0.19.8[/B][/SIZE] — a body in kit versions keeps its running gear, and weighs what it should
 

@@ -27,7 +27,9 @@ describe('interior cameras', () => {
     expect(t[0]).toEqual(['type', 'x', 'y', 'z', 'fov', 'id1:', 'id2:', 'id3:', 'id4:', 'id5:', 'id6:']);
     expect(t[1]).toMatchObject({ nodeWeight: 1.3, collision: false, selfCollision: false });
     expect((t[2] as unknown[]).slice(0, 5)).toEqual(['driver', 0.3, 0.1, 1.1, 65]);
-    expect(t[2]).toHaveLength(11);
+    expect(t[2]).toHaveLength(12);
+    expect((t[2] as unknown[])[11]).toEqual({ isInside: true }); // the game's 0.40 tells inside by this flag
+    expect(camerasInternalSection([{ id: 'h', type: 'hood', pos: [0, -1.5, 1.1], fov: 70 }], cube)![2]).toHaveLength(11);
     expect(camerasInternalSection([], cube)).toBeNull();
   });
 });

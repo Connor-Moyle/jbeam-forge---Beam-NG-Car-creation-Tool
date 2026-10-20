@@ -182,6 +182,7 @@ export function registerIpcHandlers(services: HandlerServices): void {
   registerInvoke(
     'export:install',
     async (bundle) => {
+      logger.info(`installing ${bundle.slug}: ${bundle.files.length} files, ${bundle.copies.length} textures, ${Math.round(bundle.files.reduce((n, f) => n + (f.text?.length ?? f.base64?.length ?? 0), 0) / 1e6)} MB`);
       checkBundle(bundle, (p) => projects.isUnderGrantedRoot(p));
       const mods = await modsDir();
       const r = await installUnpacked(mods, bundle);
@@ -279,7 +280,13 @@ export function registerIpcHandlers(services: HandlerServices): void {
   });
   registerInvoke('beamng:horns', async () => {
     const dir = installDir();
-    return dir ? scanHorns(dir) : [];
+    if (!dir) return [];
+    const horns = await scanHorns(dir).catch((err: unknown) => {
+      logger.warn(`horns of ${dir}: ${err instanceof Error ? err.message : String(err)}`);
+      return [];
+    });
+    if (!horns.length) logger.warn(`no horns found in ${dir} (vehicles/common/sounds/*.jbeam in common.zip)`);
+    return horns;
   });
   registerInvoke('beamng:wheels', async () => {
     const dir = installDir();

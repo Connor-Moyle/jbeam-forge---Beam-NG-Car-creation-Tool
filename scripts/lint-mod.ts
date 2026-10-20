@@ -132,9 +132,9 @@ const slotTypes = new Set([...parts.values(), ...gameParts.values()].flatMap((p)
 const partsBySlot = new Map<string, string[]>();
 for (const [name, p] of parts) for (const st of slotTypesOf(p)) partsBySlot.set(st, [...(partsBySlot.get(st) ?? []), name]);
 // Filled by the game's own common parts (every stock car declares them), and meshes from vehicles/common.
-const GAME_SLOT_TYPES = new Set(['paint_design', 'skin_glass', 'licenseplate_design_2_1', 'soundscape_horn']);
-/** Parts the game's vehicles/common has (its horns: soundscape_horn_1…). */
-const gamePart = (name: string) => /^soundscape_horn_\d+$/.test(name);
+const GAME_SLOT_TYPES = new Set(['paint_design', 'skin_glass', 'licenseplate_design_2_1', 'soundscape_horn', 'seat_occupant']);
+/** Parts the game's vehicles/common has (its horns: soundscape_horn_1…; the seat occupant since 0.40). */
+const gamePart = (name: string) => /^soundscape_horn_\d+$/.test(name) || name === 'occupant_generic';
 const GAME_MESHES = new Set(['licenseplate', 'towhitch', 'n2o_bottle_10lb', 'n2o_bottle_20lb']);
 for (const [name, p] of parts) {
   for (const r of slotRows(p)) {
@@ -226,8 +226,10 @@ for (const name of installed) {
   // A borrowed part (slug_F_…, slug_E_…) naming a node its own car doesn't have either is the game's
   // leftover (the Barstow's exhaust and rs1l): the game drops that beam on the stock car too.
   const borrowed = new RegExp(`^${slug}_[A-Z]\\d?_`).test(name);
-  if (p.beams) for (const r of readTable(p.beams).records) for (const k of ['id1:', 'id2:']) if (!nodeOwner.has(s(r.values[k]))) (borrowed ? warnings : errors).push(`${name}: beam references missing node ${s(r.values[k])}`);
-  if (p.triangles) for (const r of readTable(p.triangles).records) for (const k of ['id1:', 'id2:', 'id3:']) if (!nodeOwner.has(s(r.values[k]))) errors.push(`${name}: triangle references missing node ${s(r.values[k])}`);
+  // A node named by an expression ("$='ocp'..$seatID..'1'", the game's seat occupant) is only known at spawn.
+  const unresolved = (v: Parameters<typeof s>[0]) => s(v).startsWith('$');
+  if (p.beams) for (const r of readTable(p.beams).records) for (const k of ['id1:', 'id2:']) if (!unresolved(r.values[k]) && !nodeOwner.has(s(r.values[k]))) (borrowed ? warnings : errors).push(`${name}: beam references missing node ${s(r.values[k])}`);
+  if (p.triangles) for (const r of readTable(p.triangles).records) for (const k of ['id1:', 'id2:', 'id3:']) if (!unresolved(r.values[k]) && !nodeOwner.has(s(r.values[k]))) errors.push(`${name}: triangle references missing node ${s(r.values[k])}`);
   if (p.refNodes) for (const r of readTable(p.refNodes).records) for (const v of Object.values(r.values)) if (!nodeOwner.has(s(v))) errors.push(`${name}: refNode ${s(v)} missing`);
   if (!game && name !== slug && !p.flexbodies && !p.nodes) warnings.push(`${name}: no flexbodies and no nodes (empty part)`);
 }

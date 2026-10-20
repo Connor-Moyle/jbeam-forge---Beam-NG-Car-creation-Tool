@@ -63,32 +63,37 @@ async function fingerprint(folder: string): Promise<string> {
 }
 
 /** The complete suspensions written by buildPartObjects (<dir>/<vehicle>/<part>/set.json). */
+/** Every set's set.json, a vehicle at a time in parallel (3,574 of them from the game's 0.40 took three minutes one by one). */
 async function loadSets(dir: string): Promise<SuspensionSet[]> {
-  const out: SuspensionSet[] = [];
   let vehicles: string[] = [];
   try {
     vehicles = (await readdir(dir)).filter((v) => !v.startsWith('_'));
   } catch {
-    return out;
+    return [];
   }
-  for (const v of vehicles) {
-    let parts: string[] = [];
-    try {
-      parts = await readdir(join(dir, v));
-    } catch {
-      continue;
-    }
-    for (const p of parts) {
-      const folder = join(dir, v, p);
+  const perVehicle = await Promise.all(
+    vehicles.map(async (v) => {
+      let parts: string[] = [];
       try {
-        const s = JSON.parse(await readFile(join(folder, 'set.json'), 'utf8')) as Omit<SuspensionSet, 'id' | 'mesh' | 'jbeam' | 'logo'> & { mesh: string; logo: string | null };
-        out.push({ ...s, kind: s.kind ?? 'suspension', slotType: s.slotType ?? '', id: `${v}/${p}`, mesh: join(folder, s.mesh), jbeam: join(folder, 'jbeam.json'), logo: s.logo ? join(folder, s.logo) : null });
+        parts = await readdir(join(dir, v));
       } catch {
-        // not a set folder
+        return [];
       }
-    }
-  }
-  return out;
+      const loaded = await Promise.all(
+        parts.map(async (p): Promise<SuspensionSet | null> => {
+          const folder = join(dir, v, p);
+          try {
+            const s = JSON.parse(await readFile(join(folder, 'set.json'), 'utf8')) as Omit<SuspensionSet, 'id' | 'mesh' | 'jbeam' | 'logo'> & { mesh: string; logo: string | null };
+            return { ...s, kind: s.kind ?? 'suspension', slotType: s.slotType ?? '', id: `${v}/${p}`, mesh: join(folder, s.mesh), jbeam: join(folder, 'jbeam.json'), logo: s.logo ? join(folder, s.logo) : null };
+          } catch {
+            return null; // not a set folder
+          }
+        }),
+      );
+      return loaded.filter((s): s is SuspensionSet => s !== null);
+    }),
+  );
+  return perVehicle.flat();
 }
 
 function runWorker(job: ScanJob): Promise<ScanResult> {
@@ -205,6 +210,7 @@ export class UserLibrary {
         const items = await loadBundledObjects(join(out, 'BeamNG'), this.logger, 'bng');
         objects.push(...items);
         sets.push(...(await loadSets(join(out, 'sets'))));
+        this.logger.info(`BeamNG parts: ${items.length} objects, ${sets.length} sets`);
         status.push({ kind: 'beamng', folder: install, count: items.length, error: null });
       } catch (err) {
         const message = err instanceof Error ? err.message : String(err);

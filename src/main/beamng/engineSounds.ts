@@ -144,22 +144,19 @@ export async function scanHorns(installDir: string): Promise<Horn[]> {
   const out: Horn[] = [];
   for (const zip of await zipsOf(installDir)) {
     if (!zip.toLowerCase().endsWith('common.zip')) continue;
-    try {
-      await withZip(zip, async (z) => {
-        for (const e of await z.entries()) {
-          if (!/vehicles\/common\/sounds\/[^/]+\.jbeam$/i.test(e.name)) continue;
-          const { value } = parseJbeam(await z.readText(e.name, 4 * 1024 * 1024));
-          if (!isJbeamObject(value)) continue;
-          for (const [part, body] of Object.entries(value)) {
-            if (!/^soundscape_horn_\d+$/.test(part) || !isJbeamObject(body)) continue;
-            const info = body.information;
-            out.push({ part, label: isJbeamObject(info) && typeof info.name === 'string' ? info.name : part });
-          }
+    // An unreadable zip throws: the caller says so in the log.
+    await withZip(zip, async (z) => {
+      for (const e of await z.entries()) {
+        if (!/vehicles\/common\/sounds\/[^/]+\.jbeam$/i.test(e.name)) continue;
+        const { value } = parseJbeam(await z.readText(e.name, 4 * 1024 * 1024));
+        if (!isJbeamObject(value)) continue;
+        for (const [part, body] of Object.entries(value)) {
+          if (!/^soundscape_horn_\d+$/.test(part) || !isJbeamObject(body)) continue;
+          const info = body.information;
+          out.push({ part, label: isJbeamObject(info) && typeof info.name === 'string' ? info.name : part });
         }
-      });
-    } catch {
-      // unreadable zip: skip
-    }
+      }
+    });
   }
   return out.sort((a, b) => Number(a.part.slice(16)) - Number(b.part.slice(16)));
 }

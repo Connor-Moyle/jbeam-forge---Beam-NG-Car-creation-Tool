@@ -588,6 +588,7 @@ export async function runExport(mode: 'install' | 'zip'): Promise<void> {
   try {
     const bundle = await finalBundle(prepared.bundle, (busy) => ui.set({ busy }));
     ui.set({ busy: mode === 'install' ? 'Installing into BeamNG…' : 'Writing zip…' });
+    logger.info(`export ${mode}: sending ${bundle.files.length} files and ${bundle.copies.length} textures`);
     const r = mode === 'install' ? await call('export:install', bundle) : await call('export:zip', bundle);
     if (r) {
       ui.set({ result: { ...r, mode } });

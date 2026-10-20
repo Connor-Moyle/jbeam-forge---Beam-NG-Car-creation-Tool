@@ -380,6 +380,40 @@ describe('jbeam export', () => {
     expect(flexGroupsOf(doc, badge, slotTypeOf(doc.parts, badge))).toEqual([slotTypeOf(doc.parts, badge)]);
   });
 
+  it("seats the game's occupant on every seat, the driver on the driver camera's side, and leaves the seat cameras to them", () => {
+    const { doc, meshes } = carProject();
+    const shifted = (m: ProxyMesh, dx: number): ProxyMesh => ({ ...m, positions: m.positions.map((v, i) => (i % 3 === 0 ? v + dx : v)) });
+    const seatL = createPart(doc, tax, { taxonomyId: 'seat', position: 'FL', id: 'p_seat_FL', parentPartId: 'p_body' });
+    const seatR = createPart(doc, tax, { taxonomyId: 'seat', position: 'FR', id: 'p_seat_FR', parentPartId: 'p_body' });
+    assignMeshes(doc, ['s:seat_FL'], seatL.id);
+    assignMeshes(doc, ['s:seat_FR'], seatR.id);
+    generateStructure(doc, tax, [
+      { partId: seatL.id, mesh: shifted(box(0.25, -0.2, 0.3, 0.4, 1.0, 2), 0.4) },
+      { partId: seatR.id, mesh: shifted(box(0.25, -0.2, 0.3, 0.4, 1.0, 2), -0.4) },
+    ]);
+    doc.cameras = [
+      { id: 'c1', type: 'driver', pos: [-0.4, 0, 1.0], fov: 60 },
+      { id: 'c2', type: 'hood', pos: [0, -1.5, 1.2], fov: 70 },
+    ];
+    const names = exportMeshNames(doc, [...meshes, { key: 's:seat_FL', name: 'seat_FL', sourceId: 's' }, { key: 's:seat_FR', name: 'seat_FR', sourceId: 's' }]);
+    const files = new Map(buildJbeamFiles(doc, tax, { meshNames: names, author: 'x' }).map((f) => [f.part, parsePart(f.text)[1]]));
+    const right = files.get('test_seat_FR')!;
+    const slot = readTable(right.slots2!).records.find((r) => r.values.name === 'seat_occupant_FR')!;
+    expect(slot.values.default).toBe('occupant_generic');
+    const o = slot.inlineOptions as { coreSlot: boolean; nodeMove: { x: number; y: number; z: number }; variables: Record<string, string | number> };
+    expect(o.coreSlot).toBe(true);
+    expect(o.variables).toMatchObject({ $seatID: 'FR', $isDriver: 'RHD', $TriggerHighlightMesh: names.get('s:seat_FR') });
+    const ids = new Set(readTable(right.nodes!).records.map((r) => r.values.id));
+    for (const k of ['FL', 'FR', 'RL', 'RR', 'TL', 'TR']) expect(ids.has(String(o.variables[`$occupant_attachnode${k}`]))).toBe(true);
+    expect(o.nodeMove.x).toBeCloseTo(-0.4, 1);
+    expect(o.nodeMove.y).toBeCloseTo(0.1, 1);
+    expect(o.nodeMove.z).toBeGreaterThan(0.4);
+    expect(right.triangles).toBeUndefined();
+    const leftSlot = readTable(files.get('test_seat_FL')!.slots2!).records.find((r) => r.values.name === 'seat_occupant_FL')!;
+    expect((leftSlot.inlineOptions as { variables: Record<string, unknown> }).variables.$isDriver).toBeUndefined();
+    expect(readTable(files.get('test_body')!.camerasInternal!).records.map((r) => r.values.type)).toEqual(['hood']);
+  });
+
   it('writes the body part deterministically (snapshot)', () => {
     const { doc, meshes } = carProject();
     const files = buildJbeamFiles(doc, tax, { meshNames: exportMeshNames(doc, meshes), author: 'Fatkiwi' });
