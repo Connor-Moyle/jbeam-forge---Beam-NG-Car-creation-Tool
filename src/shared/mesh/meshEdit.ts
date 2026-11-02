@@ -62,15 +62,22 @@ export function projectUvs(pos: ArrayLike<number>, p: UvProjection): Float32Arra
   return out;
 }
 
-type M = number[]; // 4×4 column-major
+export type M = number[]; // 4×4 column-major
 
 const mul = (a: M, b: M): M => {
   const o = new Array<number>(16).fill(0);
   for (let c = 0; c < 4; c++) for (let r = 0; r < 4; r++) for (let k = 0; k < 4; k++) o[c * 4 + r]! += a[k * 4 + r]! * b[c * 4 + k]!;
   return o;
 };
-const translate = ([x, y, z]: readonly number[]): M => [1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, x!, y!, z!, 1];
-const scaleM = ([x, y, z]: readonly number[]): M => [x!, 0, 0, 0, 0, y!, 0, 0, 0, 0, z!, 0, 0, 0, 0, 1];
+export const translation = ([x, y, z]: readonly number[]): M => [1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, x!, y!, z!, 1];
+export const scaling = ([x, y, z]: readonly number[]): M => [x!, 0, 0, 0, 0, y!, 0, 0, 0, 0, z!, 0, 0, 0, 0, 1];
+const translate = translation;
+const scaleM = scaling;
+export const IDENTITY_MATRIX: M = translation([0, 0, 0]);
+
+export function transformPoint(m: M, [x, y, z]: V3): V3 {
+  return [m[0]! * x + m[4]! * y + m[8]! * z + m[12]!, m[1]! * x + m[5]! * y + m[9]! * z + m[13]!, m[2]! * x + m[6]! * y + m[10]! * z + m[14]!];
+}
 function rotation([rx, ry, rz]: readonly number[]): M {
   const [a, b, c] = [rx!, ry!, rz!].map((d) => (d * Math.PI) / 180) as [number, number, number];
   const X: M = [1, 0, 0, 0, 0, Math.cos(a), Math.sin(a), 0, 0, -Math.sin(a), Math.cos(a), 0, 0, 0, 0, 1];

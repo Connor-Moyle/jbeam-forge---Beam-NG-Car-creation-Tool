@@ -1,8 +1,9 @@
 import { useEffect } from 'react';
-import { IDENTITY_PLACEMENT, type Placement } from '@shared/project/schema';
-import { samePlacement, type ShownPlacement } from '@shared/placement';
+import { IDENTITY_PLACEMENT } from '@shared/project/schema';
+import { samePlacement } from '@shared/placement';
+import { trackChange } from '@shared/suspension/track';
 import { applyPlacement } from './placement';
-import { applyMeshEdits, editsKey } from './meshEdits';
+import { applyMeshEdits, applyTrackMoves, editsKey } from './meshEdits';
 import { applyMeshModels } from '@renderer/modelling/build';
 import { dropModels, modelledMeshes } from '@renderer/modelling/commands';
 import { isAcHelperMesh } from '@shared/ac/helpers';
@@ -28,13 +29,6 @@ import type { ImportedMesh } from './normalize';
 import { EMPTY_ARR } from '@shared/empty';
 import { offerAutoClassify } from '@renderer/parts/commands';
 import { acOption } from './kn5';
-
-/** A source as the viewport shows it: a fitted suspension stretched to its axle's track, as the export does. */
-function shownPlacement(sourceId: string, placement: Placement): ShownPlacement {
-  const axle = projectStore.getState().doc?.axles.find((a) => a.fitted?.sourceId === sourceId);
-  const lateral = axle?.fitted?.track ? axle.track / axle.fitted.track : 1;
-  return lateral === 1 ? placement : { ...placement, lateral };
-}
 
 const logger = rlog('import');
 
@@ -80,7 +74,7 @@ function storedPath(absolutePath: string): string {
 /** What a source's derived meshes depend on (splits, per-mesh edits and copies). */
 function deriveKey(doc: Project | null, sourceId: string, meshKeys: ReadonlySet<string>): string {
   const models = doc?.meshModels ?? {};
-  return `${JSON.stringify(splitsForSource(doc?.splits ?? EMPTY_ARR, sourceId))}|${editsKey(meshKeys, doc?.meshEdits ?? {}, doc?.meshCopies ?? EMPTY_ARR)}|${JSON.stringify(Object.entries(models).filter(([k]) => meshKeys.has(k)))}`;
+  return `${JSON.stringify(splitsForSource(doc?.splits ?? EMPTY_ARR, sourceId))}|${editsKey(meshKeys, doc?.meshEdits ?? {}, doc?.meshCopies ?? EMPTY_ARR)}|${JSON.stringify(Object.entries(models).filter(([k]) => meshKeys.has(k)))}|${JSON.stringify(doc ? trackChange(doc, sourceId) : null)}`;
 }
 
 /** The meshes a source shows: its raw import with splits, then per-mesh edits and copies, applied. */
@@ -103,6 +97,9 @@ export function deriveMeshes(sourceId: string, raw: ImportedMesh[]): { meshes: I
     logger.warn(`reshaped meshes no longer match the file: ${stale.join(', ')}`);
     useUiStore.getState().pushStatus(`${stale.length === 1 ? stale[0] : `${stale.length} meshes`} changed in the file since you reshaped ${stale.length === 1 ? 'it' : 'them'} in Modelling: showing the file's version`, 'warning', 10000);
   }
+  // A fitted suspension at its axle's track (hubs out, arms longer), then the user's own moves on top.
+  const change = doc ? trackChange(doc, sourceId) : null;
+  if (change) meshes = applyTrackMoves(meshes, change);
   meshes = applyMeshEdits(meshes, doc?.meshEdits ?? {}, doc?.meshCopies ?? EMPTY_ARR);
   return { meshes, splitsKey: deriveKey(doc, sourceId, keys) };
 }
@@ -261,9 +258,8 @@ async function loadFromDisk(source: Source, quiet = false): Promise<void> {
     }
     if (source.format === 'fbx') adoptLegacyFbxKeys(source.id, done.meshes);
     registerImportedTextures(done.meshes);
-    const shown = shownPlacement(source.id, source.placement);
-    applyPlacement(done.meshes, IDENTITY_PLACEMENT, shown);
-    store({ ...base, status: 'ready', placement: shown, raw: done.meshes, ...deriveMeshes(source.id, done.meshes), textures: done.textures, error: null, stats: { triangles: staged.triangles, totalMs: done.totalMs } });
+    applyPlacement(done.meshes, IDENTITY_PLACEMENT, source.placement);
+    store({ ...base, status: 'ready', placement: source.placement, raw: done.meshes, ...deriveMeshes(source.id, done.meshes), textures: done.textures, error: null, stats: { triangles: staged.triangles, totalMs: done.totalMs } });
     seedMaterials(source.id, done.meshes); // projects from before materials existed
     if (source.format === 'kn5' && acOption('acIgnoreHelpers')) useSceneStore.getState().setHidden(acHelperKeys(done.meshes), true);
   } catch (err) {
@@ -357,25 +353,24 @@ export function useSourceSync(): void {
     }
   }, [sources]);
 
-  // Placement changed (moved in the Placement dialog, undo/redo, an axle's track): move the loaded geometry, no reload.
-  const axles = useProjectStore((s) => s.doc?.axles ?? EMPTY_ARR);
+  // Placement changed (moved in the Placement dialog, undo/redo): move the loaded geometry, no reload.
   useEffect(() => {
     const scene = useSceneStore.getState();
     for (const s of sources) {
       const loaded = scene.sources[s.id];
-      const shown = shownPlacement(s.id, s.placement);
-      if (loaded?.status !== 'ready' || !loaded.placement || samePlacement(loaded.placement, shown)) continue;
-      applyPlacement(loaded.raw, loaded.placement, shown);
-      scene.setSource({ ...loaded, placement: shown, ...deriveMeshes(s.id, loaded.raw) });
+      if (loaded?.status !== 'ready' || !loaded.placement || samePlacement(loaded.placement, s.placement)) continue;
+      applyPlacement(loaded.raw, loaded.placement, s.placement);
+      scene.setSource({ ...loaded, placement: s.placement, ...deriveMeshes(s.id, loaded.raw) });
     }
-  }, [sources, axles]);
+  }, [sources]);
 
   // Splits changed (split, unsplit, undo/redo): re-derive the affected sources from their raw meshes.
-  // Per-mesh edits and copies too: the same re-derive.
+  // Per-mesh edits and copies too, and an axle's track: the same re-derive.
   const splits = useProjectStore((s) => s.doc?.splits ?? EMPTY_ARR);
   const meshEdits = useProjectStore((s) => s.doc?.meshEdits);
   const meshCopies = useProjectStore((s) => s.doc?.meshCopies);
   const meshModels = useProjectStore((s) => s.doc?.meshModels);
+  const axles = useProjectStore((s) => s.doc?.axles ?? EMPTY_ARR);
   useEffect(() => {
     const scene = useSceneStore.getState();
     const doc = projectStore.getState().doc;
@@ -385,7 +380,7 @@ export function useSourceSync(): void {
       if (deriveKey(doc, src.sourceId, splitKeys) === src.splitsKey) continue;
       scene.setSource({ ...src, ...deriveMeshes(src.sourceId, src.raw) });
     }
-  }, [splits, meshEdits, meshCopies, meshModels]);
+  }, [splits, meshEdits, meshCopies, meshModels, axles]);
 
   // Leaving the editor (project closed) cancels loads and frees all geometry.
   useEffect(

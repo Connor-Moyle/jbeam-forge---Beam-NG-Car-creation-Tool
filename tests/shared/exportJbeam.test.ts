@@ -299,7 +299,7 @@ describe('jbeam export', () => {
     expect(slotChoices(doc, tax).some((s) => s.label === rim.displayName)).toBe(false);
   });
 
-  it('stretches a fitted suspension sideways when the axle’s track differs from the set’s own', () => {
+  it('moves a fitted suspension’s hubs out when the axle’s track is wider than the set’s own', () => {
     const { doc, meshes } = carProject();
     createPart(doc, tax, { taxonomyId: 'suspension_set', id: 'p_front_set' });
     const hub = { slotType: 'car_suspension_F', nodes: [['id', 'posX', 'posY', 'posZ'], ['fh1l', 0.7, -1.3, 0.3]] };
@@ -311,7 +311,7 @@ describe('jbeam export', () => {
       return readTable(parsePart(set.text)[1].nodes!).records[0]!.values.posX;
     };
     expect(hubX(1.5)).toBe(0.7);
-    expect(hubX(1.65)).toBeCloseTo(0.77);
+    expect(hubX(1.65)).toBeCloseTo(0.775);
   });
 
   it('bolts a game suspension to the body, never to the hood or a door next to it', () => {

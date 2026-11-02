@@ -18,7 +18,7 @@ import { bodyPart, buildJbeamFiles, damagedMaterialName, nodesExported, SET_KIND
 import { placeRefNodes } from '@shared/proxy/derive';
 import type { Project } from '@shared/project/schema';
 import { buildGlowMap, lightFunction, onMaterialName } from '@shared/export/lights';
-import { loadFittedSets, tyreFouls, useSetData, useSuspensionCatalogue } from '@renderer/suspension/commands';
+import { fittedMeshTransforms, loadFittedSets, tyreFouls, useSetData, useSuspensionCatalogue } from '@renderer/suspension/commands';
 import { exportMeshNames, infoJson, materialsJson } from '@shared/export/files';
 import { withMeasured } from '@shared/export/performance';
 import { configFileName, configInfoJson, includedParts, resolveConfig } from '@shared/export/configs';
@@ -240,7 +240,7 @@ export function prepareExport(): PreparedExport | null {
     materialJsonAll[damagedMaterialName(name)] = dmg;
   }
   const meshMaterials = new Map(daeMeshes.map((dm) => [dm.name, dm.materials]));
-  const jbeams = buildJbeamFiles(doc, tax, { meshNames, author, suspensions: useSetData.getState().data, wheelParts: useSetData.getState().wheelParts, glowMap, meshMaterials, scripts: scripts.parts });
+  const jbeams = buildJbeamFiles(doc, tax, { meshNames, author, suspensions: useSetData.getState().data, wheelParts: useSetData.getState().wheelParts, meshTransforms: fittedMeshTransforms(), glowMap, meshMaterials, scripts: scripts.parts });
   const root = `vehicles/${slug}`;
   // The default configuration, then every one made in the Configurations panel: a .pc, its info and a preview each.
   const configs = [null, ...doc.configs];
@@ -306,13 +306,13 @@ export function prepareExport(): PreparedExport | null {
     const text = set ? suspensionLoadWarning(set, a.name.replace(/ axle$/i, '').toLowerCase(), defaultWeightKg) : null;
     if (text) report.warnings.push({ code: 'SUSPENSION_LOAD', message: text });
   }
-  // A suspension stretched or squeezed far from its own width: the Sunburst's rally struts squeezed
+  // A suspension widened or narrowed far from its own track: the Sunburst's rally struts squeezed
   // to 84% threw a lower ball joint off at spawn. A warning, with the number.
   for (const a of fittedAxles) {
     for (const s of [a.fitted!, ...(a.alternates ?? [])]) {
       const ratio = s.track ? a.track / s.track : 1;
       if (ratio < 0.9 || ratio > 1.15)
-        report.warnings.push({ code: 'TRACK_STRETCH', message: `${s.name} on the ${a.name.replace(/ axle$/i, '').toLowerCase()} axle is ${ratio < 1 ? 'squeezed' : 'stretched'} to ${Math.round(ratio * 100)}% of its own width (${(s.track! * 1000).toFixed(0)} mm): more than about 10% either way can make its arms fight and come apart at spawn. Keep the axle's track near ${(s.track! * 1000).toFixed(0)} mm, or pick a suspension from a car this wide.` });
+        report.warnings.push({ code: 'TRACK_STRETCH', message: `${s.name} on the ${a.name.replace(/ axle$/i, '').toLowerCase()} axle has its hubs ${(Math.abs(a.track - s.track!) * 500).toFixed(0)} mm ${ratio < 1 ? 'in' : 'out'} per side from where the game made them (${Math.round(ratio * 100)}% of its ${(s.track! * 1000).toFixed(0)} mm track): arms lengthened by more than about 10% can fight and come apart at spawn. Keep the axle's track near ${(s.track! * 1000).toFixed(0)} mm, or pick a suspension from a car this wide.` });
     }
   }
   // Structure of the car's own that starts inside a fitted suspension's tyres (the dialog's button moves it out).

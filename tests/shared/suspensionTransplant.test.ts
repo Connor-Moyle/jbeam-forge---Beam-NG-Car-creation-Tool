@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import type { JbeamObject } from '@shared/jbeam/parse';
 import { bakeComponents, bakeSlotOffsets, definedNodes, externalNodeRefs, planeDistance, scaleSteering, setGroups, shiftOffset, slender, thickness, transplantSuspension, tuningVariables, type V3 } from '@shared/suspension/transplant';
+import { translation } from '@shared/mesh/meshEdit';
 
 const PARTS: Record<string, JbeamObject> = {
   car_suspension_F: {
@@ -41,15 +42,42 @@ describe('suspension jbeam transplant', () => {
     expect([...definedNodes(PARTS.car_suspension_F!).keys()]).toEqual(['fh1r', 'fh1l']);
   });
 
-  it('stretches the set sideways about its centre line when the track changes', () => {
-    const r = transplantSuspension({ parts: PARTS, root: 'car_suspension_F', anchors: {}, offset: [0.1, 0, 0], partPrefix: 'm_F_', nodePrefix: 'f_', target: [], meshNames: {}, tuning: {}, lateral: 1.1 });
+  it('a wider track moves the hub nodes out, not the whole set, and the wheel slots with them', () => {
+    // The set's own track is 1.5 m and the axle wants 1.6: 5 cm out per side, about the set's centre line (x = 0.1 here).
+    const track = { half: 0.75, d: 0.05, centre: 0.1 };
+    const r = transplantSuspension({ parts: PARTS, root: 'car_suspension_F', anchors: {}, offset: [0.1, 0, 0], partPrefix: 'm_F_', nodePrefix: 'f_', target: [], meshNames: {}, tuning: {}, track });
     const s = r.parts.m_F_car_suspension_F!;
     const rows = (s.nodes as unknown[][]).filter((n) => typeof n[0] === 'string' && n[0].startsWith('f_'));
-    expect(rows.map((n) => n[1])).toEqual([expect.closeTo(-0.67), expect.closeTo(0.87)]);
-    // Wheel slot offset (a variable plus a number) is stretched as a formula; y and z only move with the set.
+    expect(rows.map((n) => n[1])).toEqual([expect.closeTo(-0.65), expect.closeTo(0.85)]);
+    // Wheel slot offset (a variable plus a number) moves out by the same; y and z only move with the set.
     const slot = (s.slots2 as unknown[][]).find((row) => row[0] === 'wheel_F_5')!.at(-1) as { nodeOffset: { x: string; y: number } };
-    expect(slot.nodeOffset.x).toBe('$=(($trackoffset_F + 0.26) * 1.1) + 0.1');
+    expect(slot.nodeOffset.x).toBe('$=($trackoffset_F + 0.26) + 0.15');
     expect(slot.nodeOffset.y).toBe(-1.3);
+    // An inboard node (a subframe's) stays where it is.
+    const inboard = { ...PARTS, car_suspension_F: { ...PARTS.car_suspension_F!, nodes: [['id', 'posX', 'posY', 'posZ'], ['fx0', 0, -1.3, 0.3], ['fh1r', -0.7, -1.3, 0.3]] } };
+    const r2 = transplantSuspension({ parts: inboard, root: 'car_suspension_F', anchors: {}, offset: [0, 0, 0], partPrefix: 'm_F_', nodePrefix: 'f_', target: [], meshNames: {}, tuning: {}, track: { half: 0.75, d: 0.05, centre: 0 } });
+    expect((r2.parts.m_F_car_suspension_F!.nodes as unknown[][]).slice(1).map((n) => n[1])).toEqual([0, -0.75]);
+  });
+
+  it('nodes follow the meshes the user moved on their own; a node shared by two moved meshes takes their mean', () => {
+    const parts: Record<string, JbeamObject> = {
+      s: {
+        slotType: 's',
+        flexbodies: [['mesh', '[group]:'], ['arm_R', ['arm_R']], ['hub_R', ['hub_R']], ['frame', ['frame']]],
+        nodes: [['id', 'posX', 'posY', 'posZ'], { group: 'frame' }, ['in', -0.3, -1, 0.3], { group: 'arm_R' }, ['bj', -0.7, -1, 0.3, { group: ['arm_R', 'hub_R'] }], ['top', -0.6, -1, 0.6, { group: 'hub_R' }], ['fx', '$=-0.6', -1, 0.6, { group: 'hub_R' }]],
+      },
+    };
+    const moved = (meshTransforms: Record<string, number[]>) => {
+      const r = transplantSuspension({ parts, root: 's', anchors: {}, offset: [0, 0, 0], partPrefix: 'm_', nodePrefix: 'f_', target: [], meshNames: { arm_R: 'arm', hub_R: 'hub', frame: 'frame' }, tuning: {}, meshTransforms });
+      return Object.fromEntries((r.parts.m_s!.nodes as unknown[][]).filter((row) => typeof row[0] === 'string' && row[0] !== 'id').map((row) => [row[0] as string, row.slice(1, 4)]));
+    };
+    // Only the hub mesh moved 5 cm outward: its nodes go with it, the arm's inner pivot stays, and the
+    // balljoint (shared by arm and hub) follows the hub since the arm wasn't touched. A formula
+    // position moves as a formula.
+    const out = translation([-0.05, 0, 0]);
+    expect(moved({ hub_R: out })).toEqual({ f_in: [-0.3, -1, 0.3], f_bj: [-0.75, -1, 0.3], f_top: [-0.65, -1, 0.6], f_fx: ['$=(-0.6) + -0.05', -1, 0.6] });
+    // Hub and arm both moved, by different amounts: the shared balljoint takes the mean.
+    expect(moved({ hub_R: out, arm_R: translation([-0.01, 0, 0]) }).f_bj).toEqual([-0.73, -1, 0.3]);
   });
 
   it('renames, moves, re-attaches and re-points everything', () => {

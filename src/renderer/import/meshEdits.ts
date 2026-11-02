@@ -1,6 +1,7 @@
 import { Box3, BufferAttribute, Matrix4, Vector3, type BufferGeometry } from 'three';
 import { editMatrix, flipsWinding, isIdentityTransform, isIdentityUv, mapUv, MIRROR_X, mirroredName, projectUvs } from '@shared/mesh/meshEdit';
 import type { MeshCopy, MeshEdit } from '@shared/project/schema';
+import { trackMatrix, trackMoves, type TrackChange } from '@shared/suspension/track';
 import type { ImportedMesh } from './normalize';
 
 /**
@@ -85,6 +86,27 @@ function edited(m: ImportedMesh, e: MeshEdit | undefined): ImportedMesh {
   // The centre the edit turns about, for the viewport gizmo's maths, and the matrix for Modelling's.
   geometry.userData = { ...geometry.userData, editPivot: pivot, editMatrix: matrix };
   return { ...m, geometry };
+}
+
+/**
+ * A fitted suspension at its axle's track: hubs slid out, arms stretched from their inner ends
+ * (suspension/track.ts), baked into the meshes before the user's own edits. The matrix is kept on
+ * the geometry for the export, which moves the set's nodes by the same.
+ */
+export function applyTrackMoves(meshes: readonly ImportedMesh[], change: TrackChange): ImportedMesh[] {
+  const boxes = meshes.map((m) => {
+    if (!m.geometry.boundingBox) m.geometry.computeBoundingBox();
+    const b = m.geometry.boundingBox ?? new Box3();
+    return { key: m.key, min: [b.min.x, b.min.y, b.min.z] as [number, number, number], max: [b.max.x, b.max.y, b.max.z] as [number, number, number] };
+  });
+  const moves = new Map(trackMoves(boxes, change).map((mv) => [mv.key, trackMatrix(mv)]));
+  return meshes.map((m) => {
+    const matrix = moves.get(m.key);
+    if (!matrix) return m;
+    const geometry = baked(m.geometry, matrix, null);
+    geometry.userData = { ...geometry.userData, trackMatrix: matrix };
+    return { ...m, geometry };
+  });
 }
 
 export function applyMeshEdits(meshes: readonly ImportedMesh[], edits: Readonly<Record<string, MeshEdit>>, copies: readonly MeshCopy[]): ImportedMesh[] {

@@ -16,7 +16,7 @@ import { setPlacement } from '@renderer/import/PlacementDialog';
 import { defaultSettings, stageImport } from '@renderer/import/pipeline';
 import { cornerTargets } from '@renderer/objects/placeObject';
 import { assignToNewPart } from '@renderer/parts/commands';
-import { IDENTITY_EDIT } from '@shared/mesh/meshEdit';
+import { IDENTITY_EDIT, IDENTITY_MATRIX, multiply, type M } from '@shared/mesh/meshEdit';
 import { ownWheelFittings, setTrack, setWheels } from '@shared/suspension/wheels';
 import { bakeSlotOffsets } from '@shared/suspension/transplant';
 import { axleTags, SET_KINDS } from '@shared/export/jbeam';
@@ -340,10 +340,29 @@ async function fitSuspensionSteps(axleId: string, set: SuspensionSet, asOption: 
   useUiStore
     .getState()
     .pushStatus(
-      `Fitted the ${set.vehicleName} ${set.name} (${set.type}) to the ${axle.name.toLowerCase()}. Its track is ${(width * 1000).toFixed(0)} mm (change Track on the axle to widen or narrow it on export).${moved ? ` Your ${moved === 1 ? 'wheel and its brakes' : 'wheels and brakes'} moved onto its hubs.` : ''} The arrows are on it: drag to fine-tune (its physics and the wheels move with it).`,
+      `Fitted the ${set.vehicleName} ${set.name} (${set.type}) to the ${axle.name.toLowerCase()}. Its track is ${(width * 1000).toFixed(0)} mm: change Track on the axle and its hubs move out and its arms lengthen to suit.${moved ? ` Your ${moved === 1 ? 'wheel and its brakes' : 'wheels and brakes'} moved onto its hubs.` : ''} The arrows are on it: drag to fine-tune (its physics and the wheels move with it), or select any one arm or hub and move it on its own.`,
       'success',
       10000,
     );
+}
+
+/**
+ * What the user did to each mesh of a fitted set, as the matrix the export moves the set's nodes
+ * by: its track move (hubs out, arms longer) with the user's own move, turn or resize on top.
+ */
+export function fittedMeshTransforms(): Map<string, M> {
+  const doc = projectStore.getState().doc;
+  const out = new Map<string, M>();
+  if (!doc) return out;
+  const ids = new Set(doc.axles.flatMap((a) => [a.fitted, ...(a.alternates ?? [])].flatMap((s) => (s ? [s.sourceId] : []))));
+  for (const s of [doc.powertrain?.engine, doc.powertrain?.gearbox, ...(doc.powertrain?.alternates ?? [])]) if (s?.sourceId) ids.add(s.sourceId);
+  for (const id of ids) {
+    for (const m of useSceneStore.getState().sources[id]?.meshes ?? []) {
+      const { trackMatrix, editMatrix } = m.geometry.userData as { trackMatrix?: M; editMatrix?: M | null };
+      if (trackMatrix || editMatrix) out.set(m.key, multiply(editMatrix ?? IDENTITY_MATRIX, trackMatrix ?? IDENTITY_MATRIX));
+    }
+  }
+  return out;
 }
 
 /** The car's own parts at a wheel: they move with the wheel when a suspension holds it. */

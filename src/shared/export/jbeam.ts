@@ -14,6 +14,8 @@ import { couplerFor, type Hinge } from '../hinges/schema';
 import { hingeIds } from '../hinges/build';
 import { limiterBound } from '../hinges/geometry';
 import { bakeSlotOffsets, definedNodes, definedWeights, scaleSteering, setGroups, transplantSuspension } from '../suspension/transplant';
+import { trackChange } from '../suspension/track';
+import type { M } from '../mesh/meshEdit';
 import { blockNodes } from '../powertrain/placement';
 import { firstSlotType } from '../jbeam/slots';
 import { nodesTouchingOtherParts } from './contact';
@@ -60,6 +62,8 @@ export interface JbeamExportOptions {
   glowMap?: Readonly<Record<string, { simpleFunction: JbeamValue; off: string; on: string }>>;
   /** Fitted suspensions' jbeam (by catalogue set id), brought over into the mod. */
   suspensions?: Readonly<Record<string, SuspensionSetData>>;
+  /** meshKey → the matrix of what the user did to that mesh of a fitted set (its own move, turn or resize, with its track move); the set's nodes follow. */
+  meshTransforms?: ReadonlyMap<string, M>;
   /**
    * By fitting (its sourceId): the game's wheel and tyre parts an axle beyond the first of its end
    * carries as its own copies (ownWheelFittings), so two axles of one end can't clash in the game.
@@ -534,7 +538,7 @@ export function buildJbeamFiles(fullDoc: Doc, tax: TaxonomyLookup, opts: JbeamEx
   })();
   // Wheel and powertrain device names the axles before the one being brought already use (each is built once by the game).
   const usedNames = new Set<string>();
-  const bring = (setId: string, sourceId: string, tag: string, target: readonly { id: string; pos: [number, number, number] }[], tuning: Record<string, number>, slotRewrites?: Record<string, { slotType: string; part: string }>, edits?: PowertrainEdits, choices?: SetChoices, driveline?: PowertrainEdits, linkedNodes?: Record<string, string>, lateral?: number, axle?: { steer?: number | undefined; used: ReadonlySet<string>; names: Set<string> }) => {
+  const bring = (setId: string, sourceId: string, tag: string, target: readonly { id: string; pos: [number, number, number] }[], tuning: Record<string, number>, slotRewrites?: Record<string, { slotType: string; part: string }>, edits?: PowertrainEdits, choices?: SetChoices, driveline?: PowertrainEdits, linkedNodes?: Record<string, string>, axle?: { steer?: number | undefined; used: ReadonlySet<string>; names: Set<string> }) => {
     const got = opts.suspensions?.[setId];
     if (!got) return null;
     // An axle beyond the first of its end carries its own copies of its wheels and tyres.
@@ -555,8 +559,11 @@ export function buildJbeamFiles(fullDoc: Doc, tax: TaxonomyLookup, opts: JbeamEx
     const meshNames: Record<string, string> = {};
     for (const [key, name] of opts.meshNames) if (key.startsWith(`${sourceId}:`) && !key.includes('/')) meshNames[key.slice(sourceId.length + 1)] = name;
     const offset = fullDoc.sources?.find((s) => s.id === sourceId)?.placement.position ?? [0, 0, 0];
+    // The user's own moves of the set's meshes (with their track moves): the nodes follow them.
+    const meshTransforms: Record<string, M> = {};
+    for (const [key, m] of opts.meshTransforms ?? []) if (key.startsWith(`${sourceId}:`) && !key.includes('/')) meshTransforms[key.slice(sourceId.length + 1)] = m;
     // Every engine shares the e_ node names (only one is fitted at a time), so the gearbox fits whichever is chosen.
-    const t = transplantSuspension({ parts: data.parts, root: data.root, anchors: data.anchors, offset, partPrefix: `${slug}_${tag}_`, nodePrefix: `${tag.startsWith('E') ? 'e' : tag.toLowerCase()}_`, target, meshNames, tuning, slotRewrites, linkedNodes, fallbackGroup: bodyGroup, held: found.held, lateral, ownWheels: !!ownWheels });
+    const t = transplantSuspension({ parts: data.parts, root: data.root, anchors: data.anchors, offset, partPrefix: `${slug}_${tag}_`, nodePrefix: `${tag.startsWith('E') ? 'e' : tag.toLowerCase()}_`, target, meshNames, tuning, slotRewrites, linkedNodes, fallbackGroup: bodyGroup, held: found.held, track: trackChange(fullDoc, sourceId) ?? undefined, meshTransforms, ownWheels: !!ownWheels });
     for (const [name, content] of Object.entries(t.parts)) files.push({ file: `${name}.jbeam`, part: name, text: serializeJbeam({ [name]: content }) });
     foreign.push({ slot: foreignSlot, parts: Object.values(t.parts) });
     return t;
@@ -578,13 +585,13 @@ export function buildJbeamFiles(fullDoc: Doc, tax: TaxonomyLookup, opts: JbeamEx
     // This axle's suspensions (one is installed at a time) share names freely; they avoid the earlier axles'.
     const names = new Set<string>();
     const unique = { steer: axle.steer, used: new Set(usedNames), names };
-    const t = bring(axle.fitted.setId, axle.fitted.sourceId, axleTag(i), mountNodes, axle.tuning, undefined, undefined, axle.fitted.choices, axle.edits, blockOfEngine, axle.fitted.track ? axle.track / axle.fitted.track : undefined, unique);
+    const t = bring(axle.fitted.setId, axle.fitted.sourceId, axleTag(i), mountNodes, axle.tuning, undefined, undefined, axle.fitted.choices, axle.edits, blockOfEngine, unique);
     if (!t) return;
     axleSets.push({ index: i, t });
     // The other suspensions for this axle fill the same slot: the player (or a configuration) picks one.
     const tags = axleTags(axle, i);
     const others = (axle.alternates ?? []).flatMap((alt) => {
-      const a = bring(alt.setId, alt.sourceId, tags.get(alt.sourceId) ?? `${axleTag(i)}2`, mountNodes, axle.tuning, undefined, undefined, alt.choices, axle.edits, blockOfEngine, alt.track ? axle.track / alt.track : undefined, unique);
+      const a = bring(alt.setId, alt.sourceId, tags.get(alt.sourceId) ?? `${axleTag(i)}2`, mountNodes, axle.tuning, undefined, undefined, alt.choices, axle.edits, blockOfEngine, unique);
       return a ? [a.rootSlotType] : [];
     });
     for (const n of names) usedNames.add(n);

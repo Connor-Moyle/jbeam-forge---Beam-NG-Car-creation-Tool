@@ -381,7 +381,7 @@ export const FittedSuspensionSchema = z.object({
   vehicle: z.string(),
   type: z.string(),
   sourceId: z.string(),
-  /** Wheel centre to wheel centre of the set as the game built it, metres. The axle's track against this stretches the set sideways on export. */
+  /** Wheel centre to wheel centre of the set as the game built it, metres. The axle's track against this moves the set's hubs out and lengthens its arms (suspension/track.ts). */
   track: z.number().positive().optional(),
   /** The game's other parts for its slots (fork): default per slot and which ship as choices. */
   choices: SetChoicesSchema.optional(),

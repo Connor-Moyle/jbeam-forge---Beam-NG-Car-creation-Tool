@@ -102,7 +102,7 @@ function AxleCard({ axle }: { axle: Axle }) {
         <Field label="Position" hint="Along the car (− is forward)">
           <NumberInput aria-label="Axle position" value={axle.y} onChange={(y) => updateAxle(axle.id, { y })} step={0.01} precision={3} unit="m" />
         </Field>
-        <Field label="Track" hint="Wheel centre to centre">
+        <Field label="Track" hint="Wheel centre to centre. A fitted suspension's hubs move out to it and its arms lengthen; the subframe stays">
           <NumberInput aria-label="Track width" value={axle.track} onChange={(track) => updateAxle(axle.id, { track })} step={0.01} min={0.3} max={4} precision={3} unit="m" />
         </Field>
         <Toggle checked={axle.steered} onChange={(steered) => updateAxle(axle.id, { steered })} label="Steers" />

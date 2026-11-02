@@ -1,5 +1,7 @@
 import { isJbeamObject, type JbeamObject, type JbeamValue } from '../jbeam/parse';
 import { readTable } from '../jbeam/tables';
+import { transformPoint, type M } from '../mesh/meshEdit';
+import { trackMatrix, trackMoves, type TrackChange } from './track';
 import { STABILITY_DT, STABILITY_OK } from '../proxy/derive';
 import { mountsHolding } from '../proxy/hold';
 import { firstSlotType, slotTypesOf } from '../jbeam/slots';
@@ -158,8 +160,13 @@ export interface TransplantInput {
   fallbackGroup?: string;
   /** The set's own nodes its car's body also held (the Autobello's fx0): bolted to the new body. */
   held?: readonly string[];
-  /** Sideways stretch of the set about its centre line (new track ÷ its own): hubs, arms and wheel slots move out or in. 1 or unset: as the game made it. */
-  lateral?: number;
+  /** The axle's track against the set's own: hubs slide out, arms stretch from their inner ends, the wheel slots follow (see suspension/track.ts). Unset: as the game made it. */
+  track?: TrackChange;
+  /**
+   * Original mesh name → the matrix (car space, after `offset`) of the move, turn or resize the user
+   * gave that mesh on its own, with its track move. The set's nodes follow the meshes that ride on them.
+   */
+  meshTransforms?: Readonly<Record<string, M>>;
   /**
    * The set carries its own copies of its wheels and tyres (an axle beyond the first of its end): their
    * slot types and the hub nodes are renamed like everything else, so two axles of one end can't clash.
@@ -413,17 +420,8 @@ export function bakeSlotOffsets(parts: Record<string, JbeamObject>): Record<stri
   return out;
 }
 
-/** A sideways coordinate stretched by `k` about the centre line; formulas and variables keep working ("$=(…) * k"). */
-export function stretchX(v: JbeamValue, k: number): JbeamValue {
-  if (Math.abs(k - 1) < 1e-9) return v;
-  if (typeof v === 'number') return Math.round(v * k * 1e6) / 1e6;
-  if (typeof v === 'string' && v.startsWith('$=')) return `$=(${v.slice(2)}) * ${k}`;
-  if (typeof v === 'string' && v.startsWith('$')) return `$=${v} * ${k}`;
-  return v;
-}
-
 /** Slot rows' nodeOffset {x, y, z} (where child parts such as wheels sit) moved with the suspension. */
-function shiftSlotOffsets(table: JbeamValue, offset: V3, lateral = 1): JbeamValue {
+function shiftSlotOffsets(table: JbeamValue, offset: V3): JbeamValue {
   if (!Array.isArray(table)) return table;
   return table.map((row, i) => {
     if (i === 0 || !Array.isArray(row)) return row;
@@ -432,7 +430,7 @@ function shiftSlotOffsets(table: JbeamValue, offset: V3, lateral = 1): JbeamValu
       const o = cell.nodeOffset;
       const moved: JbeamObject = { ...o };
       (['x', 'y', 'z'] as const).forEach((axis, k) => {
-        if (o[axis] !== undefined) moved[axis] = shiftOffset(axis === 'x' ? stretchX(o[axis], lateral) : o[axis], offset[k]!);
+        if (o[axis] !== undefined) moved[axis] = shiftOffset(o[axis], offset[k]!);
       });
       return { ...cell, nodeOffset: moved };
     });
@@ -475,7 +473,6 @@ export function transplantSuspension(given: TransplantInput): TransplantResult {
   // Component switches baked first: the weights below read the numbers (a formula read as 25 kg
   // gave a 2 kg node mounts stiff enough to throw it off at spawn).
   const input: TransplantInput = { ...given, parts: Object.fromEntries(Object.entries(given.parts).map(([n, p]) => [n, bakeComponents(p) as JbeamObject])) };
-  const lateral = input.lateral && input.lateral > 0 ? input.lateral : 1;
   const warnings: string[] = [];
   const partNames = new Map(Object.keys(input.parts).map((n) => [n, `${input.partPrefix}${n}`]));
   const slotTypes = new Map<string, string>();
@@ -520,13 +517,51 @@ export function transplantSuspension(given: TransplantInput): TransplantResult {
       }
     }
   }
-  const setPositions = new Map<string, V3>();
-  for (const body of Object.values(input.parts)) for (const [id, pos] of definedNodes(body)) if (!setPositions.has(id)) setPositions.set(id, [pos[0] * lateral, pos[1], pos[2]]);
   const keepGroup = (g: JbeamValue): JbeamValue => (typeof g === 'string' && input.fallbackGroup && !groups.has(g) ? input.fallbackGroup : g);
+  const vars = variableDefaults(Object.values(input.parts));
+
+  // Where each node ends up (car space): with the set, then with the meshes that ride on it (the
+  // mean when several moved meshes share it, so a hub moved alone takes the arm's outer end with
+  // it while the arm's inner pivot stays), or, with no mesh on it, out with the track like a hub.
+  const nodeGroups = new Map<string, string[]>();
+  for (const [g, ids] of groupNodes) for (const id of ids) nodeGroups.set(id, [...(nodeGroups.get(id) ?? []), g]);
+  const byGroup = new Map<string, M[]>();
+  for (const body of Object.values(input.parts)) {
+    if (!Array.isArray(body.flexbodies)) continue;
+    for (const row of body.flexbodies.slice(1)) {
+      if (!Array.isArray(row) || typeof row[0] !== 'string' || !Array.isArray(row[1])) continue;
+      const m = input.meshTransforms?.[row[0]];
+      if (!m) continue;
+      for (const g of row[1]) if (typeof g === 'string') byGroup.set(g, [...(byGroup.get(g) ?? []), m]);
+    }
+  }
+  const round6 = (v: number) => Math.round(v * 1e6) / 1e6;
+  const nodeAt = (id: string, base: V3): V3 => {
+    const world = add(base, input.offset);
+    const ms = [...new Set((nodeGroups.get(id) ?? []).flatMap((g) => byGroup.get(g) ?? []))];
+    let at = world;
+    if (ms.length) at = ms.map((m) => transformPoint(m, world)).reduce(add).map((v) => v / ms.length) as V3;
+    else if (input.track) {
+      const mv = trackMoves([{ key: id, min: world, max: world }], input.track)[0];
+      if (mv) at = transformPoint(trackMatrix(mv), world);
+    }
+    return at.map(round6) as V3;
+  };
+  const worldAt = new Map<string, V3>();
+  const baseAt = new Map<string, V3>();
+  for (const body of Object.values(input.parts))
+    for (const [id, pos] of definedNodes(body)) {
+      if (worldAt.has(id)) continue;
+      baseAt.set(id, pos);
+      worldAt.set(id, nodeAt(id, pos));
+    }
+  // The same, in the set's own coordinates (what the mounts and the flatness checks below work in).
+  const setPositions = new Map([...worldAt].map(([id, p]) => [id, [p[0] - input.offset[0], p[1] - input.offset[1], p[2] - input.offset[2]] as V3]));
+  // The wheels sit by their slots' offsets (x mirrored per side by the game): out with the track.
+  const slotShift: V3 = [round6(input.offset[0] + (input.track?.d ?? 0)), input.offset[1], input.offset[2]];
 
   // How much spring the set's beams put on each node it doesn't define: hydros and torsion bars too
   // (the Burnside's steering hydro pushes on its steering box points, and a light point flew off).
-  const vars = variableDefaults(Object.values(input.parts));
   // The springs each of the set's own nodes already carries, from the set's own beams.
   const ownSpring = new Map<string, number>();
   const anchorSpring = new Map<string, number>();
@@ -716,13 +751,18 @@ export function transplantSuspension(given: TransplantInput): TransplantResult {
       if (section === 'information') part[section] = value;
       // A part that fits several slots (one intake for three engines) keeps fitting each of them.
       else if (section === 'slotType') part[section] = typeof value === 'string' ? (slotTypes.get(value) ?? value) : Array.isArray(value) ? value.map((v) => (typeof v === 'string' ? (slotTypes.get(v) ?? v) : v)) : value;
-      else if (section === 'slots' || section === 'slots2') part[section] = shiftSlotOffsets(renameStrings(rewriteSlots(value, input.slotRewrites ?? {}), names), input.offset, lateral);
+      else if (section === 'slots' || section === 'slots2') part[section] = shiftSlotOffsets(renameStrings(rewriteSlots(value, input.slotRewrites ?? {}), names), slotShift);
       else if (section === 'nodes' && Array.isArray(value)) {
         part[section] = value.map((row, i) => {
           if (i === 0 || !Array.isArray(row) || typeof row[0] !== 'string') return row;
           const [id, x, y, z, ...rest] = row;
-          // Formula positions move too ("$=… + d"), or those nodes stayed where the original car had them.
-          const moved = typeof x === 'number' && typeof y === 'number' && typeof z === 'number' ? add([x * lateral, y, z], input.offset) : [shiftOffset(stretchX(x!, lateral), input.offset[0]), shiftOffset(y!, input.offset[1]), shiftOffset(z!, input.offset[2])];
+          let moved: JbeamValue[];
+          if (typeof x === 'number' && typeof y === 'number' && typeof z === 'number') moved = worldAt.get(id) ?? add([x, y, z], input.offset);
+          else {
+            // Formula positions move too ("$=… + d"), by what the node moves at its worked-out position.
+            const [base, at] = [baseAt.get(id), worldAt.get(id)];
+            moved = [x!, y!, z!].map((v, k) => shiftOffset(v, base && at ? round6(at[k]! - base[k]!) : input.offset[k]!));
+          }
           return [nodeIds.get(id) ?? id, ...moved, ...rest] as JbeamValue[];
         });
       } else if (section === 'flexbodies' && Array.isArray(value)) {
