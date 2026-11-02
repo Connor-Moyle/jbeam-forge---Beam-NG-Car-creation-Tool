@@ -16,7 +16,7 @@ import { setPlacement } from '@renderer/import/PlacementDialog';
 import { defaultSettings, stageImport } from '@renderer/import/pipeline';
 import { cornerTargets } from '@renderer/objects/placeObject';
 import { assignToNewPart } from '@renderer/parts/commands';
-import { IDENTITY_EDIT, IDENTITY_MATRIX, multiply, type M } from '@shared/mesh/meshEdit';
+import { IDENTITY_EDIT, IDENTITY_MATRIX, isIdentityTransform, mirroredName, multiply, type M } from '@shared/mesh/meshEdit';
 import { ownWheelFittings, setTrack, setWheels } from '@shared/suspension/wheels';
 import { bakeSlotOffsets } from '@shared/suspension/transplant';
 import { axleTags, SET_KINDS } from '@shared/export/jbeam';
@@ -203,9 +203,71 @@ export function updateAxle(id: string, patch: Partial<Omit<Axle, 'id' | 'fitted'
     coalesce: `axle:${id}:${Object.keys(patch).join(',')}`,
     apply: (d) => {
       const a = d.axles.find((x) => x.id === id);
-      if (a) Object.assign(a, patch);
+      if (!a) return;
+      // Its suspensions ride along the car with the axle.
+      if (patch.y !== undefined && patch.y !== a.y)
+        for (const s of d.sources) {
+          if (![a.fitted, ...(a.alternates ?? [])].some((f) => f?.sourceId === s.id)) continue;
+          const [x, y, z] = s.placement.position;
+          s.placement = { ...s.placement, position: [x, Math.round((y + patch.y - a.y) * 1e6) / 1e6, z] };
+        }
+      Object.assign(a, patch);
     },
   });
+  if (patch.y !== undefined) followSetWheels(id);
+}
+
+/** The keys of a fitted set's meshes the user moved, turned or resized on their own. */
+export function movedSetMeshes(doc: Project, sourceId: string): string[] {
+  const prefix = `${sourceId}:`;
+  return Object.keys(doc.meshEdits).filter((k) => k.startsWith(prefix) && !isIdentityTransform(doc.meshEdits[k]!));
+}
+
+/** Every one of a set's meshes back where the game (and the axle's track) put it. */
+export function resetSetMoves(sourceId: string): void {
+  const doc = projectStore.getState().doc;
+  const keys = doc ? movedSetMeshes(doc, sourceId) : [];
+  if (!keys.length) return;
+  projectStore.getState().execute({
+    label: 'Reset suspension moves',
+    apply: (d) => {
+      for (const k of keys) delete d.meshEdits[k];
+    },
+  });
+}
+
+/**
+ * Copy the moves of a set's meshes on one side onto their opposite numbers ("…_FL" ↔ "…_FR"),
+ * mirrored across the car. Mirrors the selected ones when any of the set is selected, else every
+ * moved mesh whose opposite number hasn't been moved. Returns how many were mirrored.
+ */
+export function mirrorSetMoves(sourceId: string, selection: readonly string[]): number {
+  const doc = projectStore.getState().doc;
+  if (!doc) return 0;
+  const names = new Set((useSceneStore.getState().sources[sourceId]?.meshes ?? []).map((m) => m.name));
+  const moved = movedSetMeshes(doc, sourceId);
+  const picked = selection.filter((k) => moved.includes(k));
+  const pairs: [string, string][] = [];
+  for (const k of picked.length ? picked : moved) {
+    const name = k.slice(sourceId.length + 1);
+    const other = mirroredName(name);
+    const otherKey = `${sourceId}:${other}`;
+    if (!names.has(other) || other === name || pairs.some(([, to]) => to === k)) continue;
+    if (!picked.length && moved.includes(otherKey)) continue;
+    pairs.push([k, otherKey]);
+  }
+  if (!pairs.length) return 0;
+  projectStore.getState().execute({
+    label: 'Mirror suspension moves',
+    apply: (d) => {
+      for (const [from, to] of pairs) {
+        const e = d.meshEdits[from]!;
+        // Across the car's middle: sideways goes the other way, so do the turns about the other two axes.
+        d.meshEdits[to] = { ...(d.meshEdits[to] ?? structuredClone(IDENTITY_EDIT)), position: [-e.position[0], e.position[1], e.position[2]], rotation: [e.rotation[0], -e.rotation[1], -e.rotation[2]], scale: [...e.scale] };
+      }
+    },
+  });
+  return pairs.length;
 }
 
 /** Remove an axle and the suspension fitted to it. */

@@ -3062,6 +3062,29 @@ const scenarios = [
       assert(root && /"f_[a-z0-9]+"/.test(root.text) && /parts_F_etk800_suspension_F/.test(prepared.files.map((f) => f.text).join(' ')), 'nodes renamed and the slot added');
       partsReport.jbeam = susp.map((f) => f.path);
       writeFileSync(join(outDir, 'suspension-root.jbeam'), root.text);
+      // A wider track: the hub nodes move out by half the difference, the subframe's stay.
+      const nodesOf = (text) => new Map([...text.matchAll(/\["(f_[a-z0-9_]+)",\s*(-?[\d.]+),\s*(-?[\d.]+),\s*(-?[\d.]+)/g)].map((m) => [m[1], [+m[2], +m[3], +m[4]]]));
+      const nodesBefore = nodesOf(susp.map((f) => f.text).join('\n'));
+      await page.getByRole('button', { name: 'Back' }).click();
+      const trackField = page.getByLabel('Track width').first();
+      const track = parseFloat(await trackField.inputValue());
+      await trackField.fill((track + 0.1).toFixed(3));
+      await trackField.press('Enter');
+      await page.waitForTimeout(1500);
+      const widened = (await hook(page, 'preparedJbeams')).files.filter((f) => /_F_etk800/.test(f.path));
+      const nodesAfter = nodesOf(widened.map((f) => f.text).join('\n'));
+      let out = 0;
+      let stayed = 0;
+      for (const [id, [x]] of nodesBefore) {
+        const after = nodesAfter.get(id);
+        if (!after) continue;
+        const dx = Math.abs(after[0] - x);
+        if (Math.abs(dx - 0.05) < 0.002) out++;
+        else if (dx < 0.002) stayed++;
+      }
+      assert(out >= 2 && stayed >= 2, `track +100 mm moved the hub nodes 50 mm out and left the subframe's (${out} out, ${stayed} stayed, of ${nodesBefore.size})`);
+      partsReport.track = { out, stayed, nodes: nodesBefore.size };
+      await shot(page, 'suspension-widened');
 
       // Engine and gearbox workshop.
       await page.getByTestId('toggle-powertrain').click();

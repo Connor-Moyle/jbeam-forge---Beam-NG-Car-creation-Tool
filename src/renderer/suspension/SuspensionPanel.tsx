@@ -14,7 +14,8 @@ import { NumberInput } from '@renderer/ui/components/NumberInput';
 import { ScrollArea } from '@renderer/ui/components/ScrollArea';
 import { Toggle } from '@renderer/ui/components/Toggle';
 import { SetPicker, TuningView } from '@renderer/workshop/WorkshopUi';
-import { addAxle, addSuspensionOption, axleKind, fitSuspension, removeAxle, removeSuspension, removeSuspensionOption, setSpringScale, setSuspensionChoices, setTuning, setUpAxles, springScaleWanted, updateAxle, showGameMeshes, showOwnMeshes, useSuspensionCatalogue, useSuspensionUi } from './commands';
+import { addAxle, addSuspensionOption, axleKind, fitSuspension, mirrorSetMoves, movedSetMeshes, removeAxle, removeSuspension, removeSuspensionOption, resetSetMoves, setSpringScale, setSuspensionChoices, setTuning, setUpAxles, springScaleWanted, updateAxle, showGameMeshes, showOwnMeshes, useSuspensionCatalogue, useSuspensionUi } from './commands';
+import { useUiStore } from '@renderer/app/stores/ui';
 import { SPRING_SCALE } from '@shared/suspension/load';
 import { DrivelineView } from './DrivelineView';
 import { TravelCheck } from './TravelCheck';
@@ -92,6 +93,11 @@ function AxleCard({ axle }: { axle: Axle }) {
   const scale = axle.edits?.fields[SPRING_SCALE];
   // The car's weight over the donor's: the scale that would make the springs carry it as they carried their own car.
   const wanted = useProjectStore((s) => (s.doc && axle.fitted && scale === undefined ? springScaleWanted(s.doc, axle) : null));
+  const moved = useProjectStore((s) => (s.doc && axle.fitted ? movedSetMeshes(s.doc, axle.fitted.sourceId).length : 0));
+  const mirror = () => {
+    const n = mirrorSetMoves(axle.fitted!.sourceId, selection);
+    useUiStore.getState().pushStatus(n ? `${n} ${n === 1 ? 'move' : 'moves'} mirrored to the other side.` : 'Nothing to mirror: move an arm or hub whose name says its side (…_FL, …_R) first.', n ? 'success' : 'warning');
+  };
   return (
     <section className={styles.card} data-testid="axle-card">
       <header className={styles.axleHead}>
@@ -99,7 +105,7 @@ function AxleCard({ axle }: { axle: Axle }) {
         <Button icon={Trash2} size="sm" variant="ghost" onClick={() => removeAxle(axle.id)} aria-label={`Remove ${axle.name}`} />
       </header>
       <div className={styles.axleFields}>
-        <Field label="Position" hint="Along the car (− is forward)">
+        <Field label="Position" hint="Along the car (− is forward). A fitted suspension and the wheels move with it">
           <NumberInput aria-label="Axle position" value={axle.y} onChange={(y) => updateAxle(axle.id, { y })} step={0.01} precision={3} unit="m" />
         </Field>
         <Field label="Track" hint="Wheel centre to centre. A fitted suspension's hubs move out to it and its arms lengthen; the subframe stays">
@@ -143,6 +149,19 @@ function AxleCard({ axle }: { axle: Axle }) {
               </Button>
             </div>
           </div>
+          {moved > 0 && (
+            <div className={styles.row}>
+              <p className={styles.note}>
+                {moved === 1 ? 'One of its meshes has' : `${moved} of its meshes have`} been moved on {moved === 1 ? 'its' : 'their'} own: the jbeam&rsquo;s nodes follow (see the jbeam preview).
+              </p>
+              <Button size="sm" onClick={mirror} title="Copy the moves of the selected meshes (or every moved mesh) onto their opposite numbers, mirrored" data-testid="axle-mirror-moves">
+                Mirror to the other side
+              </Button>
+              <Button size="sm" variant="ghost" onClick={() => resetSetMoves(axle.fitted!.sourceId)} data-testid="axle-reset-moves">
+                Reset moves
+              </Button>
+            </div>
+          )}
           <div className={styles.row}>
             {own ? (
               <Button size="sm" variant="ghost" onClick={() => showGameMeshes(axle.id)}>

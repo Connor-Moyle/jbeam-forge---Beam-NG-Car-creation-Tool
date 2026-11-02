@@ -1,6 +1,6 @@
-import { useDeferredValue, useMemo } from 'react';
+import { useDeferredValue, useEffect, useMemo } from 'react';
 import { Copy, FileCode } from 'lucide-react';
-import { buildJbeamFiles } from '@shared/export/jbeam';
+import { buildJbeamFiles, SET_KINDS } from '@shared/export/jbeam';
 import { exportMeshNames } from '@shared/export/files';
 import { withMeshNames } from '@shared/parts/meshNames';
 import { useProjectStore } from '@renderer/app/stores/project';
@@ -10,6 +10,7 @@ import { useUiStore } from '@renderer/app/stores/ui';
 import { call } from '@renderer/diagnostics/ipc';
 import { useEditStore } from '@renderer/structure/editStore';
 import { currentTaxonomy } from '@renderer/parts/taxonomy';
+import { fittedMeshTransforms, loadFittedSets, useSetData } from '@renderer/suspension/commands';
 import { EmptyState } from '@renderer/ui/components/EmptyState';
 import { IconButton } from '@renderer/ui/components/IconButton';
 import { ScrollArea } from '@renderer/ui/components/ScrollArea';
@@ -47,19 +48,31 @@ export function JbeamPreviewPanel() {
   const editTris = useEditStore((s) => s.tris);
   const pickedIds = useMemo(() => [...editNodes, ...editBeams.flatMap((k) => k.split('|')), ...editTris.flatMap((k) => k.split('|'))], [editNodes, editBeams, editTris]);
   const pickedPart = useProjectStore((s) => (pickedIds.length ? (s.doc?.nodes.find((n) => n.id === pickedIds[0])?.partId ?? null) : null));
-  const activePart = pickedPart ?? scenePart;
+  // Or the part the selected mesh belongs to: drag an arm of a fitted suspension and its jbeam follows.
+  const firstSelected = useSceneStore((s) => s.selection[0] ?? null);
+  const selectedPart = useProjectStore((s) => (firstSelected ? (s.doc?.assignments[firstSelected] ?? null) : null));
+  const activePart = pickedPart ?? scenePart ?? selectedPart;
   const author = useSettingsStore((s) => s.settings?.author);
   const pushStatus = useUiStore((s) => s.pushStatus);
+  const sets = useSetData((s) => s.data);
   // Rebuilding the jbeam is cheap but not free: let fast edits (drags, nudges) coalesce.
   const deferredDoc = useDeferredValue(doc);
+  const part = deferredDoc?.parts.find((p) => p.id === activePart);
+  const isSet = !!part && SET_KINDS.has(part.taxonomyId);
+  useEffect(() => {
+    if (isSet) void loadFittedSets();
+  }, [isSet]);
 
   const file = useMemo(() => {
-    if (!deferredDoc || !activePart) return null;
-    const part = deferredDoc.parts.find((p) => p.id === activePart);
-    if (!part) return null;
+    if (!deferredDoc || !part) return null;
     const meshNames = exportMeshNames(deferredDoc, withMeshNames(deferredDoc, allMeshes(sources)));
-    return buildJbeamFiles(deferredDoc, currentTaxonomy(), { meshNames, author: author || deferredDoc.meta.author }).find((f) => f.part === part.name) ?? null;
-  }, [deferredDoc, activePart, sources, author]);
+    const files = buildJbeamFiles(deferredDoc, currentTaxonomy(), { meshNames, author: author || deferredDoc.meta.author, suspensions: sets, meshTransforms: fittedMeshTransforms() });
+    if (!isSet) return files.find((f) => f.part === part.name) ?? null;
+    // A fitted set: the root part of the jbeam brought over with the model its meshes came from.
+    const key = Object.entries(deferredDoc.assignments).find(([, pid]) => pid === part.id)?.[0];
+    const sourceId = key?.slice(0, key.indexOf(':'));
+    return files.find((f) => f.source?.root && f.source.id === sourceId) ?? null;
+  }, [deferredDoc, part, isSet, sources, author, sets]);
 
   if (!doc) return <EmptyState icon={FileCode} message="Open a project to see its jbeam." />;
   if (!file) return <EmptyState icon={FileCode} message="Select a part in the Scene tree to see the jbeam it exports." />;

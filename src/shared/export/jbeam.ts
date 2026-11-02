@@ -191,6 +191,8 @@ export interface JbeamFile {
   file: string;
   part: string;
   text: string;
+  /** For a fitted set's parts: the model they came in with, and whether this is the set's root part. */
+  source?: { id: string; root: boolean };
 }
 
 export const GROUND_MODEL: Record<string, string> = { '|NM_METAL': 'metal', '|NM_PLASTIC': 'plastic', '|NM_GLASS': 'glass', '|NM_RUBBER': 'rubber' };
@@ -564,7 +566,7 @@ export function buildJbeamFiles(fullDoc: Doc, tax: TaxonomyLookup, opts: JbeamEx
     for (const [key, m] of opts.meshTransforms ?? []) if (key.startsWith(`${sourceId}:`) && !key.includes('/')) meshTransforms[key.slice(sourceId.length + 1)] = m;
     // Every engine shares the e_ node names (only one is fitted at a time), so the gearbox fits whichever is chosen.
     const t = transplantSuspension({ parts: data.parts, root: data.root, anchors: data.anchors, offset, partPrefix: `${slug}_${tag}_`, nodePrefix: `${tag.startsWith('E') ? 'e' : tag.toLowerCase()}_`, target, meshNames, tuning, slotRewrites, linkedNodes, fallbackGroup: bodyGroup, held: found.held, track: trackChange(fullDoc, sourceId) ?? undefined, meshTransforms, ownWheels: !!ownWheels });
-    for (const [name, content] of Object.entries(t.parts)) files.push({ file: `${name}.jbeam`, part: name, text: serializeJbeam({ [name]: content }) });
+    for (const [name, content] of Object.entries(t.parts)) files.push({ file: `${name}.jbeam`, part: name, text: serializeJbeam({ [name]: content }), source: { id: sourceId, root: name === t.rootPart } });
     foreign.push({ slot: foreignSlot, parts: Object.values(t.parts) });
     return t;
   };
